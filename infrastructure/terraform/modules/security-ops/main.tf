@@ -4,8 +4,8 @@ Security Ops Module: Detection and Response Infrastructure
 ==============================================================================
 Provisions security operations components:
 - CloudTrail for API audit logging (S3 delivery)
-- GuardDuty and Security Hub for threat detection (planned)
-- EventBridge and Lambda for automated incident response (planned)
+- GuardDuty and Security Hub for threat detection 
+- EventBridge and Lambda for automated incident response
 ==============================================================================
 */
 
@@ -129,7 +129,7 @@ data "aws_iam_policy_document" "cloudtrail_cloudwatch_logs" {
       "logs:PutLogEvents"
     ]
     resources = [
-      "${aws_cloudwatch_log_group.cw_cloudtrail_logs_group.arn}:*"
+      "${aws_cloudwatch_log_group.cw_cloudtrail_logs_group.arn:*}"
     ]
   }
 }
@@ -164,6 +164,7 @@ resource "aws_securityhub_account" "security_hub" {}
 
 # --- INCIDENT RESPONSE ---
 
+# CloudWatch Event rule that captures AttachRolePolicy with AdministratorAccess
 resource "aws_cloudwatch_event_rule" "iam_admin_attachment" {
   name        = "${var.project}-capture-iam-admin-attachment"
   description = "Capture AttachRolePolicy with AdministratorAccess"
@@ -187,6 +188,7 @@ resource "aws_cloudwatch_event_target" "iam_admin_block_lambda" {
   arn       = aws_lambda_function.iam_admin_policy_revoke.arn
 }
 
+# Lambda execution role
 resource "aws_iam_role" "lambda_exec_role" {
   name = "${var.project}-lambda-exec-role"
 
@@ -202,10 +204,11 @@ resource "aws_iam_role" "lambda_exec_role" {
   })
 }
 
+# IAM Policy to allow Lambda to detach policies from roles and push logs
 data "aws_iam_policy_document" "lambda_remediation_permissions" {
   statement {
-    sid     = "AllowIAMRemediation"
-    effect  = "Allow"
+    sid    = "AllowIAMRemediation"
+    effect = "Allow"
     actions = [
       "iam:DetachRolePolicy"
     ]
@@ -214,7 +217,7 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
     ]
   }
   statement {
-    sid    = "AllowCloudWatchLogs" 
+    sid    = "AllowCloudWatchLogs"
     effect = "Allow"
     actions = [
       "logs:CreateLogGroup",
@@ -227,23 +230,27 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
   }
 }
 
+# Policy to allow Lambda to perform remediation actions and push log
 resource "aws_iam_policy" "lambda_remediation_permissions" {
   name        = "${var.project}-lambda-remediation"
   description = "Policy to allow Lambda to perform remediation actions and push logs to CloudWatch"
   policy      = data.aws_iam_policy_document.lambda_remediation_permissions.json
 }
 
+# Policy Attachment for Lambda exec role
 resource "aws_iam_role_policy_attachment" "lambda_remediation_policy_attach" {
   role       = aws_iam_role.lambda_exec_role.name
   policy_arn = aws_iam_policy.lambda_remediation_permissions.arn
 }
 
+# Package Python code for 'iam_admin_revoke.py'
 data "archive_file" "iam_admin_policy_revoke" {
   type        = "zip"
   source_file = "${path.root}/../scripts/aws-lambda/iam_admin_revoke.py"
   output_path = "${path.root}/../scripts/aws-lambda/iam_admin_revoke.zip"
 }
 
+# Lambda function to revoke AdministratorAccess from an IAM role
 resource "aws_lambda_function" "iam_admin_policy_revoke" {
   filename         = data.archive_file.iam_admin_policy_revoke.output_path
   function_name    = "${var.project}-iam-admin-policy-revoke"
@@ -259,6 +266,7 @@ resource "aws_lambda_function" "iam_admin_policy_revoke" {
   }
 }
 
+# Give permission to EventBridge to invoke the Lambda remediation function
 resource "aws_lambda_permission" "eventbridge_invoke_iam_revoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.iam_admin_policy_revoke.function_name
