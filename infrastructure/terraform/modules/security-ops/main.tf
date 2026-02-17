@@ -161,3 +161,107 @@ resource "aws_guardduty_detector_feature" "s3_protection" {
 
 # AWS Security Hub
 resource "aws_securityhub_account" "security_hub" {}
+
+# --- INCIDENT RESPONSE ---
+
+resource "aws_cloudwatch_event_rule" "iam_admin_attachment" {
+  name        = "${var.project}-capture-iam-admin-attachment"
+  description = "Capture AttachRolePolicy with AdministratorAccess"
+
+  event_pattern = jsonencode({
+    source      = ["aws.iam"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = ["AttachRolePolicy"]
+      requestParameters = {
+        policyArn = ["arn:aws:iam::aws:policy/AdministratorAccess"]
+      }
+    }
+  })
+}
+
+# Set Lambda as CloudWatch Event target
+resource "aws_cloudwatch_event_target" "iam_admin_block_lambda" {
+  rule      = aws_cloudwatch_event_rule.iam_admin_attachment.name
+  target_id = "iam-admin-revoke-lambda"
+  arn       = aws_lambda_function.iam_admin_policy_revoke.arn
+}
+
+resource "aws_iam_role" "lambda_exec_role" {
+  name = "${var.project}-lambda-exec-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+data "aws_iam_policy_document" "lambda_remediation_permissions" {
+  statement {
+    sid     = "AllowIAMRemediation"
+    effect  = "Allow"
+    actions = [
+      "iam:DetachRolePolicy"
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-*"
+    ]
+  }
+  statement {
+    sid    = "AllowCloudWatchLogs" 
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+    resources = [
+      "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*:*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_remediation_permissions" {
+  name        = "${var.project}-lambda-remediation"
+  description = "Policy to allow Lambda to perform remediation actions and push logs to CloudWatch"
+  policy      = data.aws_iam_policy_document.lambda_remediation_permissions.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_remediation_policy_attach" {
+  role       = aws_iam_role.lambda_exec_role.name
+  policy_arn = aws_iam_policy.lambda_remediation_permissions.arn
+}
+
+data "archive_file" "iam_admin_policy_revoke" {
+  type        = "zip"
+  source_file = "${path.root}/../scripts/aws-lambda/iam_admin_revoke.py"
+  output_path = "${path.root}/../scripts/aws-lambda/iam_admin_revoke.zip"
+}
+
+resource "aws_lambda_function" "iam_admin_policy_revoke" {
+  filename         = data.archive_file.iam_admin_policy_revoke.output_path
+  function_name    = "${var.project}-iam-admin-policy-revoke"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "iam_admin_revoke.handler"
+  runtime          = "python3.13"
+  source_code_hash = data.archive_file.iam_admin_policy_revoke.output_base64sha256
+
+  environment {
+    variables = {
+      LOG_LEVEL = "info"
+    }
+  }
+}
+
+resource "aws_lambda_permission" "eventbridge_invoke_iam_revoke" {
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.iam_admin_policy_revoke.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.iam_admin_attachment.arn
+}
