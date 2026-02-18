@@ -49,10 +49,11 @@ echo ""
 echo "==> Waiting for task to complete..."
 TASK_ID=$(echo "${TASK_ARN}" | awk -F'/' '{print $NF}')
 
-MAX_ATTEMPTS=30
-ATTEMPT=0
+POLL_INTERVAL=5
+MAX_WAIT=150
+ELAPSED=0
 
-while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+while [ $ELAPSED -lt $MAX_WAIT ]; do
   TASK_STATUS=$(aws ecs describe-tasks \
     --cluster "${CLUSTER_NAME}" \
     --tasks "${TASK_ID}" \
@@ -63,9 +64,9 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     break
   fi
 
-  echo "Task status: ${TASK_STATUS} (attempt $((ATTEMPT + 1))/${MAX_ATTEMPTS})"
-  sleep 5
-  ATTEMPT=$((ATTEMPT + 1))
+  echo "Task status: ${TASK_STATUS} (${ELAPSED}s/${MAX_WAIT}s)"
+  sleep $POLL_INTERVAL
+  ELAPSED=$((ELAPSED + POLL_INTERVAL))
 done
 
 # Check exit code

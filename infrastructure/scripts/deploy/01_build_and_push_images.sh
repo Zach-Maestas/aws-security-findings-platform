@@ -46,8 +46,8 @@ echo "==> Building and pushing API image..."
 docker buildx build \
   --platform linux/amd64 \
   -t "${API_REPO_URI}:latest" \
-
-
+  --push \
+  "${API_CTX}"
 
 # Build and push DB Init image
 echo ""
