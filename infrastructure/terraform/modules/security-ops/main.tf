@@ -230,7 +230,7 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
   }
 }
 
-# Policy to allow Lambda to perform remediation actions and push log
+# Policy to allow Lambda to perform remediation actions and push logs
 resource "aws_iam_policy" "lambda_remediation_permissions" {
   name        = "${var.project}-lambda-remediation"
   description = "Policy to allow Lambda to perform remediation actions and push logs to CloudWatch"
