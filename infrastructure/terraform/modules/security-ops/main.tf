@@ -181,11 +181,32 @@ resource "aws_cloudwatch_event_rule" "iam_admin_attachment" {
   })
 }
 
-# Set Lambda as CloudWatch Event target
-resource "aws_cloudwatch_event_target" "iam_admin_block_lambda" {
+# CloudWatch Event rule that captures AuthorizeSecurityGroupIngress calls
+resource "aws_cloudwatch_event_rule" "sg_ingress_revoke" {
+  name        = "${var.project}-capture-sg-ingress"
+  description = "Captures security group ingress changes for dangerous port/CIDR remediation"
+
+  event_pattern = jsonencode({
+    source      = ["aws.ec2"]
+    detail-type = ["AWS API Call via CloudTrail"]
+    detail = {
+      eventName = ["AuthorizeSecurityGroupIngress"]
+    }
+  })
+}
+
+# Set Lambda as CloudWatch Event target (IAM Admin Revoke)
+resource "aws_cloudwatch_event_target" "iam_admin_revoke_lambda" {
   rule      = aws_cloudwatch_event_rule.iam_admin_attachment.name
   target_id = "iam-admin-revoke-lambda"
   arn       = aws_lambda_function.iam_admin_policy_revoke.arn
+}
+
+# Set Lambda as CloudWatch Event target (SG Ingress Revoke)
+resource "aws_cloudwatch_event_target" "sg_ingress_revoke_lambda" {
+  rule      = aws_cloudwatch_event_rule.sg_ingress_revoke.name
+  target_id = "sg-ingress-revoke-lambda"
+  arn       = aws_lambda_function.sg_ingress_revoke.arn
 }
 
 # Lambda execution role
@@ -204,11 +225,11 @@ resource "aws_iam_role" "lambda_exec_role" {
   })
 }
 
-# IAM Policy to allow Lambda to detach policies from roles and push logs
+# IAM Policy to allow Lambda remediation actions (IAM, EC2, CloudWatch Logs)
 data "aws_iam_policy_document" "lambda_remediation_permissions" {
   statement {
-    sid    = "AllowIAMRemediation"
-    effect = "Allow"
+    sid     = "AllowIAMRemediation"
+    effect  = "Allow"
     actions = [
       "iam:DetachRolePolicy"
     ]
@@ -217,8 +238,22 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
     ]
   }
   statement {
-    sid    = "AllowCloudWatchLogs"
-    effect = "Allow"
+    sid       = "AllowSGDescribe"
+    effect    = "Allow"
+    actions   = ["ec2:DescribeSecurityGroups"]
+    resources = ["*"]
+  }
+  statement {
+    sid       = "AllowSGRemediation"
+    effect    = "Allow"
+    actions   = ["ec2:RevokeSecurityGroupIngress"]
+    resources = [
+      "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:security-group/*"
+    ]
+  }
+  statement {
+    sid     = "AllowCloudWatchLogs"
+    effect  = "Allow"
     actions = [
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
@@ -250,6 +285,13 @@ data "archive_file" "iam_admin_policy_revoke" {
   output_path = "${path.root}/../scripts/aws-lambda/iam_admin_revoke.zip"
 }
 
+# Package Python code for 'sg_ingress_revoke.py'
+data "archive_file" "sg_ingress_revoke" {
+  type        = "zip"
+  source_file = "${path.root}/../scripts/aws-lambda/sg_ingress_revoke.py"
+  output_path = "${path.root}/../scripts/aws-lambda/sg_ingress_revoke.zip"
+}
+
 # Lambda function to revoke AdministratorAccess from an IAM role
 resource "aws_lambda_function" "iam_admin_policy_revoke" {
   filename         = data.archive_file.iam_admin_policy_revoke.output_path
@@ -266,10 +308,34 @@ resource "aws_lambda_function" "iam_admin_policy_revoke" {
   }
 }
 
-# Give permission to EventBridge to invoke the Lambda remediation function
+# Lambda function to revoke dangerous SG ingress rules
+resource "aws_lambda_function" "sg_ingress_revoke" {
+  filename         = data.archive_file.sg_ingress_revoke.output_path
+  function_name    = "${var.project}-sg-ingress-revoke"
+  role             = aws_iam_role.lambda_exec_role.arn
+  handler          = "sg_ingress_revoke.handler"
+  runtime          = "python3.13"
+  source_code_hash = data.archive_file.sg_ingress_revoke.output_base64sha256
+
+  environment {
+    variables = {
+      LOG_LEVEL = "info"
+    }
+  }
+}
+
+# Give permission to EventBridge to invoke the Lambda IAM Admin revoke remediation function
 resource "aws_lambda_permission" "eventbridge_invoke_iam_revoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.iam_admin_policy_revoke.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.iam_admin_attachment.arn
+}
+
+# Give permission to EventBridge to invoke the SG ingress revoke Lambda
+resource "aws_lambda_permission" "eventbridge_invoke_sg_ingress_revoke" {
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.sg_ingress_revoke.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.sg_ingress_revoke.arn
 }
