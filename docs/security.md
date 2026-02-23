@@ -1,4 +1,4 @@
-# Security Design
+# Security Design 🛡️
 
 ![Security Architecture Diagram]()
 
