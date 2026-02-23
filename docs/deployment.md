@@ -1,4 +1,4 @@
-# Deployment Guide
+# Deployment Guide ⚙️
 
 Detailed steps for deploying, verifying, and tearing down the infrastructure. For a quick overview, see the [README](../README.md#quick-start).
 
