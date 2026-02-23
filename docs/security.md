@@ -176,5 +176,7 @@ These are planned for future phases and documented here for transparency:
 
 ## Security Trade-offs
 
-<!-- TODO(human): Write 3-5 trade-offs you consciously made in this project. For each one: what did you choose, what's the risk, and why is it acceptable for a portfolio project? Example format: -->
-- Single Lambda execution role — both Lambdas share one role with IAM + EC2 + logging permissions. The SG Lambda has `iam:DetachRolePolicy` it doesn't need, and vice versa. Simpler to manage, but violates strict least privilege. In production, separate roles per function. 
+- **Single Lambda execution role** — both Lambdas share one role with IAM + EC2 + logging permissions. The SG Lambda has `iam:DetachRolePolicy` it doesn't need, and vice versa. Simpler to manage, but violates strict least privilege. In production, separate roles per function. 
+- **Broad EventBridge trigger for SG** — fires on every ingress change, not just dangerous ones. Necessary due to EventBridge limitations, negligible cost.  
+- **`security-group/*`** resource scope — Lambda can revoke rules on any SG in the account. Can't prefix-scope SG IDs like IAM 
+  roles.           
