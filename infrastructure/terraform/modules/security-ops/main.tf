@@ -228,8 +228,8 @@ resource "aws_iam_role" "lambda_exec_role" {
 # IAM Policy to allow Lambda remediation actions (IAM, EC2, CloudWatch Logs)
 data "aws_iam_policy_document" "lambda_remediation_permissions" {
   statement {
-    sid     = "AllowIAMRemediation"
-    effect  = "Allow"
+    sid    = "AllowIAMRemediation"
+    effect = "Allow"
     actions = [
       "iam:DetachRolePolicy"
     ]
@@ -244,16 +244,16 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
     resources = ["*"]
   }
   statement {
-    sid       = "AllowSGRemediation"
-    effect    = "Allow"
-    actions   = ["ec2:RevokeSecurityGroupIngress"]
+    sid     = "AllowSGRemediation"
+    effect  = "Allow"
+    actions = ["ec2:RevokeSecurityGroupIngress"]
     resources = [
       "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:security-group/*"
     ]
   }
   statement {
-    sid     = "AllowCloudWatchLogs"
-    effect  = "Allow"
+    sid    = "AllowCloudWatchLogs"
+    effect = "Allow"
     actions = [
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
