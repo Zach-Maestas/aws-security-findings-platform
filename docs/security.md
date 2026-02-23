@@ -124,9 +124,7 @@ CloudTrail → EventBridge (AttachRolePolicy + AdministratorAccess) → Lambda �
 **Evidence:**
 
 <img src="./screenshots/phase2/cloudtrail_iam_admin_policy_attach_detach.png" height="800" width="800" /> 
-
 <img src="./screenshots/phase2/cloudwatch_logs_lambda_iam_remediation.png" height="800" width="800" /> 
-
 <img src="./screenshots/phase2/eventbridge_iam_admin_revoke_rule.png" height="800" width="800" /> 
 
 #### Dangerous Security Group Ingress Detection
@@ -145,6 +143,7 @@ CloudTrail → EventBridge (AuthorizeSecurityGroupIngress) → Lambda → ec2:Re
 **Evidence:**
 
 <img src="./screenshots/phase2/sg_all_inbound_port_22_created.png" height="800" width="800" /> 
+<img src="./screenshots/phase2/cloudtrail_sg_revoke_event_logs.png" height="800" width="800" />
 <img src="./screenshots/phase2/cloudtrail_revoke_sg.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/cloudwatch_logs_revoke_sg.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/sg_rule_revoked.png" height="800" width="800" /> 
