@@ -15,15 +15,12 @@ An IAM role was created with the attached policy `AdministratorAccess`. This pol
 - 10:53:45 PM --> `DetachRolePolicy` run by the Lambda function `secops-pipeline-iam-admin-policy-revoke` – detaching the policy `AdministratorAccess`
 
 ### Detection
-(How was it caught? What EventBridge rule matched? What CloudTrail event triggered it?)
 The policy attachment was caught by EventBridge rule `secops-pipeline-capture-iam-admin-attachment`, the CloudTrail event that triggered it was `AttachRolePolicy` with the policy `AdministratorAccess`.
 
 ### Automated Response
-(What did the Lambda do? What API call did it make?)
 The Lambda function called the IAM API via `iam.detach_role_policy(RoleName=role,PolicyArn=policy)`, detaching the AdministratorAccess policy from the `secops-pipeline-test-role` role.
 
 ### Evidence
-(Reference your screenshots — CloudTrail event, CloudWatch logs)
 <img src="./screenshots/phase2/cloudtrail_iam_admin_policy_attach_detach.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/cloudwatch_logs_lambda_iam_remediation.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/eventbridge_iam_admin_revoke_rule.png" height="800" width="800" /> 
