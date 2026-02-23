@@ -1,6 +1,6 @@
 # Security Design 🛡️
 
-![Security Architecture Diagram]()
+![Security Architecture Diagram](./screenshots/security-diagram.png)
 
 This document details the security controls implemented in the AWS DevSecOps Security Operations project. For a summary, see the [README Security Controls Table](../README.md#security-controls).
 
