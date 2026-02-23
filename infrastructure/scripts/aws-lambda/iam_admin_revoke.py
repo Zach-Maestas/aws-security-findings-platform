@@ -20,14 +20,16 @@ def revoke_policy(role, policy):
     )
 
 
+# Entry point: triggered by EventBridge on IAM AdministratorAccess attachment events
 def handler(event, context):
     try:
+        principal_arn = event["detail"]["userIdentity"]["arn"]
         role_name = event["detail"]["requestParameters"]["roleName"]
         policy_arn = event["detail"]["requestParameters"]["policyArn"]
 
+        logger.warning("⚠️ AdministratorAccess attachment by [%s] detected on role [%s]", principal_arn, role_name)
         revoke_policy(role_name, policy_arn)
-
-        logger.info("✅ IAM Policy [%s] successfully revoked from role [%s]", policy_arn, role_name)
+        logger.info("✅ IAM Policy [%s] revoked from role [%s]", policy_arn, role_name)
     except KeyError:
         logger.exception("❌ Event parsing failed:\n\n%s", event)
     except ClientError as e:
