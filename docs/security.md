@@ -1,5 +1,7 @@
 # Security Design
 
+![Security Architecture Diagram]()
+
 This document details the security controls implemented in the AWS DevSecOps Security Operations project. For a summary, see the [README Security Controls Table](../README.md#security-controls).
 
 ---
@@ -102,10 +104,10 @@ Secrets Manager → ECS Task Definition (valueFrom) → Container environment va
 | Security Hub | Centralized security findings dashboard |
 
 ### GuardDuty Enabled
-<img src="./screenshots/guardduty_enabled.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/guardduty_enabled.png" height="600" width="600" /> 
 
 ### Security Hub Enabled
-<img src="./screenshots/security_hub_enabled.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/security_hub_enabled.png" height="600" width="600" /> 
 
 ### Automated Response Pipelines
 
@@ -120,11 +122,11 @@ CloudTrail → EventBridge (AttachRolePolicy + AdministratorAccess) → Lambda �
 ```
 
 **Evidence:**
-<img src="./screenshots/cloudtrail_iam_admin_policy_attach_detach.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/cloudtrail_iam_admin_policy_attach_detach.png" height="600" width="600" /> 
 
-<img src="./screenshots/cloudwatch_logs_lambda_iam_remediation.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/cloudwatch_logs_lambda_iam_remediation.png" height="600" width="600" /> 
 
-<img src="./screenshots/eventbridge_iam_admin_revoke_rule.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/eventbridge_iam_admin_revoke_rule.png" height="600" width="600" /> 
 
 #### Dangerous Security Group Ingress Detection
 
@@ -140,16 +142,10 @@ CloudTrail → EventBridge (AuthorizeSecurityGroupIngress) → Lambda → ec2:Re
 - Port detection uses range checking (`fromPort <= port <= toPort`) to catch rules like `0-65535` that include dangerous ports
 
 **Evidence:**
-
-<!-- TODO: Add screenshots after simulated incident -->
-<!-- 1. Console showing SSH 0.0.0.0/0 rule being added -->
-<!-- 2. CloudTrail AuthorizeSecurityGroupIngress event -->
-<!-- 3. CloudWatch logs showing detection warning and revocation -->
-<!-- 4. Console showing the dangerous rule removed -->
-<img src="./screenshots/sg_all_inbound_port_22_created.png" height="600" width="600" /> 
-<img src="./screenshots/cloudtrail_revoke_sg.png" height="600" width="600" /> 
-<img src="./screenshots/cloudwatch_logs_revoke_sg.png" height="600" width="600" /> 
-<img src="./screenshots/sg_rule_revoked.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/sg_all_inbound_port_22_created.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/cloudtrail_revoke_sg.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/cloudwatch_logs_revoke_sg.png" height="600" width="600" /> 
+<img src="./screenshots/phase2/sg_rule_revoked.png" height="600" width="600" /> 
 
 ### Lambda IAM Permissions
 
@@ -180,4 +176,4 @@ These are planned for future phases and documented here for transparency:
 ## Security Trade-offs
 
 <!-- TODO(human): Write 3-5 trade-offs you consciously made in this project. For each one: what did you choose, what's the risk, and why is it acceptable for a portfolio project? Example format: -->
-- Single Lambda execution role
+- Single Lambda execution role — both Lambdas share one role with IAM + EC2 + logging permissions. The SG Lambda has `iam:DetachRolePolicy` it doesn't need, and vice versa. Simpler to manage, but violates strict least privilege. In production, separate roles per function. 
