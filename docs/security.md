@@ -91,16 +91,83 @@ Secrets Manager → ECS Task Definition (valueFrom) → Container environment va
 
 ---
 
+## Detection & Incident Response (Phase 2)
+
+### Monitoring Stack
+
+| Service | Purpose |
+|---------|---------|
+| CloudTrail | API audit logging with S3 delivery and CloudWatch integration |
+| GuardDuty | Automated threat detection with S3 protection |
+| Security Hub | Centralized security findings dashboard |
+
+### GuardDuty Enabled
+<img src="./screenshots/guardduty_enabled.png" height="600" width="600" /> 
+
+### Security Hub Enabled
+<img src="./screenshots/security_hub_enabled.png" height="600" width="600" /> 
+
+### Automated Response Pipelines
+
+Two EventBridge → Lambda remediation pipelines detect and respond to security events in real time:
+
+#### IAM Privilege Escalation Detection
+
+Detects `AttachRolePolicy` calls that attach `AdministratorAccess` and automatically revokes the policy.
+
+```
+CloudTrail → EventBridge (AttachRolePolicy + AdministratorAccess) → Lambda → iam:DetachRolePolicy
+```
+
+**Evidence:**
+<img src="./screenshots/cloudtrail_iam_admin_policy_attach_detach.png" height="600" width="600" /> 
+
+<img src="./screenshots/cloudwatch_logs_lambda_iam_remediation.png" height="600" width="600" /> 
+
+<img src="./screenshots/eventbridge_iam_admin_revoke_rule.png" height="600" width="600" /> 
+
+#### Dangerous Security Group Ingress Detection
+
+Detects `AuthorizeSecurityGroupIngress` calls that open dangerous ports (SSH/22, RDP/3389) to the internet (`0.0.0.0/0` or `::/0`) and automatically revokes only the offending rules.
+
+```
+CloudTrail → EventBridge (AuthorizeSecurityGroupIngress) → Lambda → ec2:RevokeSecurityGroupIngress
+```
+
+**Design decisions:**
+- EventBridge triggers on all ingress changes; Lambda filters for dangerous port/CIDR combinations — necessary because EventBridge can't match deeply nested `requestParameters`
+- Only the dangerous rule is revoked, not the entire security group — minimizes blast radius to avoid breaking attached resources
+- Port detection uses range checking (`fromPort <= port <= toPort`) to catch rules like `0-65535` that include dangerous ports
+
+**Evidence:**
+
+<!-- TODO: Add screenshots after simulated incident -->
+<!-- 1. Console showing SSH 0.0.0.0/0 rule being added -->
+<!-- 2. CloudTrail AuthorizeSecurityGroupIngress event -->
+<!-- 3. CloudWatch logs showing detection warning and revocation -->
+<!-- 4. Console showing the dangerous rule removed -->
+<img src="./screenshots/sg_all_inbound_port_22_created.png" height="600" width="600" /> 
+<img src="./screenshots/cloudtrail_revoke_sg.png" height="600" width="600" /> 
+<img src="./screenshots/cloudwatch_logs_revoke_sg.png" height="600" width="600" /> 
+<img src="./screenshots/sg_rule_revoked.png" height="600" width="600" /> 
+
+### Lambda IAM Permissions
+
+| Statement | Actions | Resource Scope |
+|-----------|---------|---------------|
+| AllowIAMRemediation | `iam:DetachRolePolicy` | Project-prefixed roles only |
+| AllowSGDescribe | `ec2:DescribeSecurityGroups` | `*` (required — Describe doesn't support resource-level ARNs) |
+| AllowSGRemediation | `ec2:RevokeSecurityGroupIngress` | All security groups in account/region |
+| AllowCloudWatchLogs | `logs:CreateLogGroup`, `CreateLogStream`, `PutLogEvents` | Project-prefixed Lambda log groups |
+
+---
+
 ## What This Architecture Does NOT Include (Yet)
 
 These are planned for future phases and documented here for transparency:
 
 | Gap | Planned Phase | Notes |
 |-----|--------------|-------|
-| CloudWatch logging | Phase 2 | No container log configuration yet |
-| CloudTrail audit logging | Phase 2 | No API-level audit trail |
-| GuardDuty threat detection | Phase 2 | No automated threat detection |
-| Security Hub posture | Phase 2 | No centralized findings dashboard |
 | Container image scanning | Phase 3 | No vulnerability scanning on images |
 | IaC scanning (tfsec/checkov) | Phase 3 | No static analysis on Terraform |
 | Secret detection in code | Phase 3 | No pre-commit or CI secret scanning |
@@ -112,8 +179,5 @@ These are planned for future phases and documented here for transparency:
 
 ## Security Trade-offs
 
-<!-- TODO(human): Write 3-5 trade-offs you consciously made in this project. For each one: what did you choose, what's the risk, and why is it acceptable for a portfolio project? Example format:
-
-**[Trade-off title]**
-Chose X over Y because Z. The risk is [risk]. Acceptable here because [reason], but in production I would [what you'd change].
--->
+<!-- TODO(human): Write 3-5 trade-offs you consciously made in this project. For each one: what did you choose, what's the risk, and why is it acceptable for a portfolio project? Example format: -->
+- Single Lambda execution role
