@@ -1,4 +1,4 @@
-# Incident Narrative: Simulated Security Events
+# Incident Narrative: Simulated Security Events 🚨
 
 This document describes two simulated security incidents used to validate the automated detection and response pipelines.
 
