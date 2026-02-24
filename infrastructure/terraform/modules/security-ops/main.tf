@@ -25,6 +25,10 @@ resource "aws_cloudtrail" "this" {
 resource "aws_s3_bucket" "cloudtrail_logs" {
   bucket        = "${var.project}-cloudtrail-logs"
   force_destroy = true
+
+  tags = {
+    Name = "${var.project}-cloudtrail-logs"
+  }
 }
 
 # S3 Bucket Public Access Block
@@ -150,6 +154,10 @@ resource "aws_iam_role_policy_attachment" "cloudtrail_cloudwatch_logs_policy_att
 # AWS GuardDuty
 resource "aws_guardduty_detector" "guardduty" {
   enable = true
+
+  tags = {
+    Name = "${var.project}-guardduty"
+  }
 }
 
 # Enable AWS GuardDuty S3 Detection
@@ -169,6 +177,10 @@ resource "aws_cloudwatch_event_rule" "iam_admin_attachment" {
   name        = "${var.project}-capture-iam-admin-attachment"
   description = "Capture AttachRolePolicy with AdministratorAccess"
 
+  tags = {
+    Name = "${var.project}-capture-iam-admin-attachment"
+  }
+
   event_pattern = jsonencode({
     source      = ["aws.iam"]
     detail-type = ["AWS API Call via CloudTrail"]
@@ -185,6 +197,10 @@ resource "aws_cloudwatch_event_rule" "iam_admin_attachment" {
 resource "aws_cloudwatch_event_rule" "sg_ingress_revoke" {
   name        = "${var.project}-capture-sg-ingress"
   description = "Captures security group ingress changes for dangerous port/CIDR remediation"
+
+  tags = {
+    Name = "${var.project}-capture-sg-ingress"
+  }
 
   event_pattern = jsonencode({
     source      = ["aws.ec2"]
@@ -307,6 +323,10 @@ resource "aws_lambda_function" "iam_admin_policy_revoke" {
   runtime          = "python3.13"
   source_code_hash = data.archive_file.iam_admin_policy_revoke.output_base64sha256
 
+  tags = {
+    Name = "${var.project}-iam-admin-policy-revoke"
+  }
+
   environment {
     variables = {
       LOG_LEVEL     = "info"
@@ -323,6 +343,10 @@ resource "aws_lambda_function" "sg_ingress_revoke" {
   handler          = "sg_ingress_revoke.handler"
   runtime          = "python3.13"
   source_code_hash = data.archive_file.sg_ingress_revoke.output_base64sha256
+
+  tags = {
+    Name = "${var.project}-sg-ingress-revoke"
+  }
 
   environment {
     variables = {
@@ -351,6 +375,10 @@ resource "aws_lambda_permission" "eventbridge_invoke_sg_ingress_revoke" {
 # SNS topic for security alert notifications
 resource "aws_sns_topic" "sns_security_alerts" {
   name = "${var.project}-security-alerts"
+
+  tags = {
+    Name = "${var.project}-security-alerts"
+  }
 }
 
 # SMS subscription for security alerts

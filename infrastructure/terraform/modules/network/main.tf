@@ -118,6 +118,10 @@ resource "aws_internet_gateway" "this" {
 resource "aws_eip" "nat" {
   count  = length(aws_subnet.public)
   domain = "vpc"
+
+  tags = {
+    Name = "${var.project}-nat-eip-${count.index + 1}"
+  }
 }
 
 # NAT Gateways (one per AZ, placed in public subnets)
