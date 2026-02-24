@@ -66,14 +66,15 @@ Key work:
 - RDS PostgreSQL with security group scoped access
 - Bootstrap method using ECS db-init task for repeatable teardown/rebuild
 
-### Phase 2: Cloud Security — Detection, Monitoring, and Incident Response — 🔲 Next
+### Phase 2: Cloud Security — Detection, Monitoring, and Incident Response — ✅ Complete
 Demonstrate operational security capabilities: detect threats, investigate findings, and respond to incidents.
 
-Planned work:
+Key work:
 - CloudTrail enabled and queryable for audit trails
 - GuardDuty for threat detection with Security Hub aggregation
 - CloudWatch log organization with documented triage workflow
 - Automated response via EventBridge and Lambda
+- Alerting via SNS
 - Simulated security incident with full detect → investigate → respond lifecycle
 - Written incident narrative documenting detection, response, and lessons learned
 - Python scripting for detection and triage automation
