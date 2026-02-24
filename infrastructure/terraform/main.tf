@@ -74,6 +74,7 @@ module "app" {
 
 # Security & Operations Module
 module "security_ops" {
-  source  = "./modules/security-ops"
-  project = var.project
+  source      = "./modules/security-ops"
+  project     = var.project
+  alert_email = var.alert_email
 }

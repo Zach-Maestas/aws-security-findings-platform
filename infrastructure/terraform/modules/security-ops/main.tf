@@ -263,6 +263,12 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
       "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.project}-*:*"
     ]
   }
+  statement {
+    sid       = "AllowPublishToOneTopic"
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.sns_security_alerts.arn]
+  }
 }
 
 # Policy to allow Lambda to perform remediation actions and push logs
@@ -303,7 +309,8 @@ resource "aws_lambda_function" "iam_admin_policy_revoke" {
 
   environment {
     variables = {
-      LOG_LEVEL = "info"
+      LOG_LEVEL     = "info"
+      SNS_TOPIC_ARN = aws_sns_topic.sns_security_alerts.arn
     }
   }
 }
@@ -319,7 +326,8 @@ resource "aws_lambda_function" "sg_ingress_revoke" {
 
   environment {
     variables = {
-      LOG_LEVEL = "info"
+      LOG_LEVEL     = "info"
+      SNS_TOPIC_ARN = aws_sns_topic.sns_security_alerts.arn
     }
   }
 }
@@ -338,4 +346,16 @@ resource "aws_lambda_permission" "eventbridge_invoke_sg_ingress_revoke" {
   function_name = aws_lambda_function.sg_ingress_revoke.function_name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.sg_ingress_revoke.arn
+}
+
+# SNS topic for security alert notifications
+resource "aws_sns_topic" "sns_security_alerts" {
+  name = "${var.project}-security-alerts"
+}
+
+# SMS subscription for security alerts
+resource "aws_sns_topic_subscription" "sns_security_alerts_subscription" {
+  topic_arn = aws_sns_topic.sns_security_alerts.arn
+  protocol  = "sms"
+  endpoint  = var.alert_email
 }
