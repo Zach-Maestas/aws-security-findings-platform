@@ -17,7 +17,8 @@ resource "random_password" "db_app_password" {
 
 # Secrets Manager secret for application database credentials
 resource "aws_secretsmanager_secret" "db_app_credentials" {
-  name = "${var.project}/db-app"
+  name                    = "${var.project}/db-app"
+  recovery_window_in_days = 0 # force immediate deletion for teardown/rebuild cycles
 
   tags = {
     Name = "${var.project}-db-app-credentials"

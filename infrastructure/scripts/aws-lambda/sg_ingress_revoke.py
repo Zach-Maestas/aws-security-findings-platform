@@ -4,7 +4,6 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 
-
 # Initialize logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -31,8 +30,8 @@ def revoke_dangerous_rules(sg_id, rules):
             IpPermissions=[
                 {
                     "IpProtocol": rule["ipProtocol"],
-                    "from_port": rule["from_port"],
-                    "to_port": rule["to_port"],
+                    "FromPort": rule["fromPort"],
+                    "ToPort": rule["toPort"],
                     "IpRanges": [{"CidrIp": r["cidrIp"]} for r in rule.get("ipRanges", {}).get("items", [])],
                     "Ipv6Ranges": [{"CidrIpv6": r["cidrIpv6"]} for r in rule.get("ipv6Ranges", {}).get("items", [])]
                 }
@@ -43,8 +42,8 @@ def revoke_dangerous_rules(sg_id, rules):
             "✅ Security Group Rule Revoked:\n[SG ID: %s]\n[IP Protocol: %s]\n[Port Range: %d-%d]\n[IPv4 CIDRs: %s]\n[IPv6 CIDRS: %s]", 
             sg_id, 
             rule["ipProtocol"], 
-            rule["from_port"], 
-            rule["to_port"],
+            rule["fromPort"],
+            rule["toPort"],
             [r["cidrIp"] for r in rule.get("ipRanges", {}).get("items", [])],
             [r["cidrIpv6"] for r in rule.get("ipv6Ranges", {}).get("items", [])]
             )
@@ -54,7 +53,7 @@ def get_dangerous_rules(ip_perms):
     dangerous_rules = []
 
     for item in ip_perms["items"]:
-        from_port, to_port = int(item["from_port"]), int(item["to_port"])
+        from_port, to_port = int(item["fromPort"]), int(item["toPort"])
         ipv4_cidrs = [r["cidrIp"] for r in item.get("ipRanges", {}).get("items", [])]
         ipv6_cidrs = [r["cidrIpv6"] for r in item.get("ipv6Ranges", {}).get("items", [])]
 
