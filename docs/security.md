@@ -166,6 +166,7 @@ These are planned for future phases and documented here for transparency:
 | Container image scanning | Phase 3 | No vulnerability scanning on images |
 | IaC scanning (tfsec/checkov) | Phase 3 | No static analysis on Terraform |
 | Secret detection in code | Phase 3 | No pre-commit or CI secret scanning |
+| Trust policy change detection | Future | Alert on `UpdateAssumeRolePolicy` for unexpected trust modifications |
 | Encryption at rest (RDS/KMS) | Future | RDS uses default encryption, not CMK |
 | WAF on ALB | Future | No web application firewall layer |
 | VPC Flow Logs | Future | No network traffic logging |
