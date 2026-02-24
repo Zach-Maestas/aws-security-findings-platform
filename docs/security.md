@@ -178,5 +178,5 @@ These are planned for future phases and documented here for transparency:
 
 - **Single Lambda execution role** — both Lambdas share one role with IAM + EC2 + logging permissions. The SG Lambda has `iam:DetachRolePolicy` it doesn't need, and vice versa. Simpler to manage, but violates strict least privilege. In production, separate roles per function. 
 - **Broad EventBridge trigger for SG** — fires on every ingress change, not just dangerous ones. Necessary due to EventBridge limitations, negligible cost.  
-- **`security-group/*`** resource scope — Lambda can revoke rules on any SG in the account. Can't prefix-scope SG IDs like IAM 
-  roles.           
+- **`security-group/*`** resource scope — Lambda can revoke rules on any SG in the account. Can't prefix-scope SG IDs like IAM roles.           
+- **`force_destroy = true`** on CloudTrail S3 bucket — audit logs are deleted on terraform destroy. Convenient for teardown, but production requires retention protection.  
