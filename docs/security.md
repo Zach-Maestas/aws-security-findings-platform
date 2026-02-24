@@ -84,7 +84,7 @@ Secrets Manager → ECS Task Definition (valueFrom) → Container environment va
 
 - **Non-root user** — the Dockerfile sets a non-root `USER` for the application process.
 - **Minimal base image** — Python slim variant, reducing attack surface.
-- **No SSH** — Fargate tasks have no SSH daemon; debugging through logs (CloudWatch planned for Phase 2).
+- **No SSH** — Fargate tasks have no SSH daemon; debugging through CloudWatch logs.
 - **Immutable deployments** — new code requires a new image push and service update.
 
 ---
@@ -154,6 +154,7 @@ CloudTrail → EventBridge (AuthorizeSecurityGroupIngress) → Lambda → ec2:Re
 | AllowSGDescribe | `ec2:DescribeSecurityGroups` | `*` (required — Describe doesn't support resource-level ARNs) |
 | AllowSGRemediation | `ec2:RevokeSecurityGroupIngress` | All security groups in account/region |
 | AllowCloudWatchLogs | `logs:CreateLogGroup`, `CreateLogStream`, `PutLogEvents` | Project-prefixed Lambda log groups |
+| AllowPublishToOneTopic | `sns:Publish` | Project SNS security alerts topic only |
 
 ---
 

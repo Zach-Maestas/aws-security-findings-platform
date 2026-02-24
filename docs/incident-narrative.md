@@ -23,12 +23,13 @@ The Lambda function called the IAM API via `iam.detach_role_policy(RoleName=role
 ### Evidence
 <img src="./screenshots/phase2/cloudtrail_iam_admin_policy_attach_detach.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/cloudwatch_logs_lambda_iam_remediation.png" height="800" width="800" /> 
-<img src="./screenshots/phase2/eventbridge_iam_admin_revoke_rule.png" height="800" width="800" /> 
+<img src="./screenshots/phase2/eventbridge_iam_admin_revoke_rule.png" height="800" width="800" />
+<img src="./screenshots/phase2/sns_iam_admin_revoke.png" height="800" width="800" />
 
 ### Lessons Learned
 - Automated remediation of privilege escalation significantly reduces the window of exposure — the policy was detached within 2 seconds of attachment
 - EventBridge's ability to match on specific `requestParameters` (like `policyArn`) allows precise detection without noisy false positives, unlike the SG pipeline which requires Lambda-side filtering
-- In production, this should be paired with SNS alerting — a silent revocation could mask a compromised credential that continues attempting escalation
+- SNS email alerting notifies the security team immediately after remediation — without this, a silent revocation could mask a compromised credential that continues attempting escalation
 - The shared Lambda execution role means this function also carries EC2 permissions it doesn't need — separate roles per function would limit damage if the Lambda itself were compromised
 
 ---
@@ -56,9 +57,10 @@ The Lambda function called the EC2 API via `ec2.revoke_security_group_ingress()`
 <img src="./screenshots/phase2/cloudtrail_sg_revoke_event_logs.png" height="800" width="800" />
 <img src="./screenshots/phase2/cloudtrail_revoke_sg.png" height="800" width="800" /> 
 <img src="./screenshots/phase2/cloudwatch_logs_revoke_sg.png" height="800" width="800" /> 
-<img src="./screenshots/phase2/sg_rule_revoked.png" height="800" width="800" /> 
+<img src="./screenshots/phase2/sg_rule_revoked.png" height="800" width="800" />
+<img src="./screenshots/phase2/sns_sg_rule_revoke.png" height="800" width="800" />
 
 ### Lessons Learned
 - Automated remediation should be surgical — revoking individual rules rather than deleting entire security groups prevents collateral damage to running infrastructure
 - Broad EventBridge triggers paired with precise Lambda filtering is a practical pattern when event structures are too deeply nested for EventBridge pattern matching
-- In production, this pipeline should include SNS notification so security teams are alerted when remediation occurs — automated response without human awareness risks masking persistent threats
+- SNS email notification alerts the security team when remediation occurs — automated response without human awareness risks masking persistent threats

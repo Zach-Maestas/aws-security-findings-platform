@@ -24,7 +24,7 @@ Built to be deployed, torn down, and redeployed from a single command.
 | Control | Implementation | Evidence |
 |---------|---------------|----------|
 | Network isolation | ECS tasks and RDS in private subnets, ALB in public | Security group rules in Terraform |
-| Least-privilege IAM | Scoped task role and execution role | IAM policy snippets |
+| Least-privilege IAM | Scoped execution role per service | IAM policy snippets |
 | Secrets management | DB credentials via Secrets Manager, injected at runtime | Task definition config |
 | TLS/HTTPS | ALB listener with ACM certificate | ALB listener configuration |
 | No broad ingress | Security groups scoped to specific ports and sources | SG rule audit |
@@ -72,7 +72,7 @@ Demonstrate operational security capabilities: detect threats, investigate findi
 Key work:
 - CloudTrail enabled and queryable for audit trails
 - GuardDuty for threat detection with Security Hub aggregation
-- CloudWatch log organization with documented triage workflow
+- CloudWatch log organization for audit and investigation
 - Automated response via EventBridge and Lambda
 - Alerting via SNS
 - Simulated security incident with full detect → investigate → respond lifecycle
@@ -84,14 +84,16 @@ Shift security left by embedding scanning and policy enforcement into the develo
 
 Planned work:
 - GitHub Actions with OIDC-based AWS authentication (no stored credentials)
-- Security scanning: secret detection, IaC scanning (tfsec/checkov), container image scanning
+- IaC scanning with tfsec or checkov (static analysis on Terraform)
+- Container image scanning for known vulnerabilities
+- Secret detection in code (pre-commit or CI-based)
+- Pipeline gates that block PR merges on security failures
 - Deliberate vulnerability introduction → scanner detection → documented remediation
-- Pipeline gates that block merges on security failures
 - Before/after evidence showing the security feedback loop in action
 
 ## Evidence
 
-Evidence artifacts for completed phases are in [`docs/evidence/`](docs/evidence/).
+Evidence artifacts for completed phases are in [`docs/`](docs/) — see [Security Design](docs/security.md) and [Incident Narrative](docs/incident-narrative.md).
 
 ## Known Limitations
 
@@ -113,6 +115,7 @@ Evidence artifacts for completed phases are in [`docs/evidence/`](docs/evidence/
 
 - [Deployment Guide](docs/deployment.md) — deploy, verify, teardown, and troubleshooting
 - [Security Design](docs/security.md) — security controls, IAM design, and trade-off rationale
+- [Incident Narrative](docs/incident-narrative.md) — simulated security incidents with detection and response evidence
 
 ## Repository Structure
 
@@ -120,14 +123,16 @@ Evidence artifacts for completed phases are in [`docs/evidence/`](docs/evidence/
 .
 ├── application/
 │   └── backend/              # Flask API (Dockerfile, app.py, Gunicorn)
+├── docs/                     # Security design, incident narratives, evidence
 ├── infrastructure/
 │   ├── scripts/
-│   │   ├── db-init/           # DB initialization container
+│   │   ├── aws-lambda/       # Python Lambda functions (IAM revoke, SG revoke)
+│   │   ├── db-init/          # DB initialization container
 │   │   └── deploy/           # Build, init, and scale scripts
 │   └── terraform/
 │       ├── backend-state-init/   # Bootstrap for remote state (S3 + DynamoDB)
 │       ├── ci-oidc/              # GitHub Actions OIDC federation
-│       └── modules/              # network, app, data, secrets, acm
+│       └── modules/              # network, app, data, secrets, acm, security-ops
 ├── Makefile                  # Deploy/destroy orchestration
 └── README.md
 ```
