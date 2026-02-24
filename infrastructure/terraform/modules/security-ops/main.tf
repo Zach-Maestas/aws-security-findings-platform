@@ -348,12 +348,12 @@ resource "aws_lambda_permission" "eventbridge_invoke_sg_ingress_revoke" {
   source_arn    = aws_cloudwatch_event_rule.sg_ingress_revoke.arn
 }
 
-  # SNS topic for security alert notifications
+# SNS topic for security alert notifications
 resource "aws_sns_topic" "sns_security_alerts" {
   name = "${var.project}-security-alerts"
 }
 
- # SMS subscription for security alerts
+# SMS subscription for security alerts
 resource "aws_sns_topic_subscription" "sns_security_alerts_subscription" {
   topic_arn = aws_sns_topic.sns_security_alerts.arn
   protocol  = "sms"
