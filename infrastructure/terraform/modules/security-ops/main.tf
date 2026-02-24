@@ -356,6 +356,6 @@ resource "aws_sns_topic" "sns_security_alerts" {
 # SMS subscription for security alerts
 resource "aws_sns_topic_subscription" "sns_security_alerts_subscription" {
   topic_arn = aws_sns_topic.sns_security_alerts.arn
-  protocol  = "sms"
+  protocol  = "email"
   endpoint  = var.alert_email
 }
