@@ -44,20 +44,16 @@ No security group allows `0.0.0.0/0` on any port other than the ALB's HTTPS list
 
 ## Identity & Access Management
 
-### ECS Task Roles
-
-Two separate IAM roles with distinct responsibilities:
+### ECS Execution Role
 
 | Role | Purpose | Permissions |
 |------|---------|-------------|
-| Execution Role | ECS agent pulls images and injects secrets | ECR read, Secrets Manager read |
-| Task Role | Application runtime identity | Scoped to only what the app needs |
+| Execution Role | ECS agent pulls images and injects secrets | ECR read, Secrets Manager read (specific ARNs only) |
 
 ### Least Privilege Approach
 
 - No `*` resource wildcards on sensitive actions.
 - Execution role can only read specific secrets, not all secrets in the account.
-- Task role is scoped to application needs — not reused across services.
 
 ---
 
