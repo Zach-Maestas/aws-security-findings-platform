@@ -6,6 +6,12 @@ Provisions OIDC federation for GitHub Actions CI/CD:
 - OIDC identity provider for GitHub Actions
 - Plan role: read-only, used on PR workflows for scans + terraform plan
 - Deploy role: provisioning access with permissions boundary, used on merge to main
+
+Note: This module's state is stored locally. It exists as a separate bootstrap
+workspace that must be applied before the main infrastructure. OIDC least privilege
+isn't strictly required for a personal project, but demonstrates production
+practices: prevents giving root access to GitHub Actions, prevents privilege escalation, 
+and centralizes the deployment pipeline steps.
 ==============================================================================
 */
 
