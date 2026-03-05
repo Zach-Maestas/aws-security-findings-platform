@@ -72,6 +72,10 @@ resource "aws_ecr_repository" "ecr_db_init_repo" {
   name         = "${var.project}-db-init-repo"
   force_delete = true
 
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
   tags = {
     Name = "${var.project}-db-init-repo"
   }

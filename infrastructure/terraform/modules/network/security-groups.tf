@@ -17,6 +17,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_security_group_rule" "alb_in_http" {
+  description       = "Allow HTTP from internet for HTTPS redirect"
   type              = "ingress"
   security_group_id = aws_security_group.alb.id
   from_port         = 80
@@ -26,6 +27,7 @@ resource "aws_security_group_rule" "alb_in_http" {
 }
 
 resource "aws_security_group_rule" "alb_in_https" {
+  description       = "Allow HTTPS from internet"
   type              = "ingress"
   security_group_id = aws_security_group.alb.id
   from_port         = 443
@@ -35,6 +37,7 @@ resource "aws_security_group_rule" "alb_in_https" {
 }
 
 resource "aws_security_group_rule" "alb_out_to_ecs" {
+  description              = "Allow ALB to forward traffic to ECS tasks on port 5000"
   type                     = "egress"
   security_group_id        = aws_security_group.alb.id
   from_port                = 5000
@@ -53,6 +56,7 @@ resource "aws_security_group" "ecs_tasks" {
 }
 
 resource "aws_security_group_rule" "ecs_in_from_alb_5000" {
+  description              = "Allow inbound from ALB on application port"
   type                     = "ingress"
   security_group_id        = aws_security_group.ecs_tasks.id
   from_port                = 5000
@@ -62,6 +66,7 @@ resource "aws_security_group_rule" "ecs_in_from_alb_5000" {
 }
 
 resource "aws_security_group_rule" "ecs_out_https" {
+  description       = "Allow HTTPS outbound for ECR pulls and AWS API calls"
   type              = "egress"
   security_group_id = aws_security_group.ecs_tasks.id
   from_port         = 443
@@ -71,6 +76,7 @@ resource "aws_security_group_rule" "ecs_out_https" {
 }
 
 resource "aws_security_group_rule" "ecs_out_db" {
+  description              = "Allow ECS tasks to connect to RDS PostgreSQL"
   type                     = "egress"
   security_group_id        = aws_security_group.ecs_tasks.id
   from_port                = 5432
@@ -89,6 +95,7 @@ resource "aws_security_group" "rds" {
 }
 
 resource "aws_security_group_rule" "rds_in_from_ecs" {
+  description              = "Allow PostgreSQL inbound from ECS tasks only"
   type                     = "ingress"
   security_group_id        = aws_security_group.rds.id
   from_port                = 5432
