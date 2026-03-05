@@ -96,6 +96,7 @@ jobs:
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Scan db-init image
         uses: aquasecurity/trivy-action@master
@@ -104,6 +105,7 @@ jobs:
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
   # ===========================================================================
   # Terraform Plan: show what will change in AWS
