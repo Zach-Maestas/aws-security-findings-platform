@@ -1,0 +1,131 @@
+name: PR Security Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ===========================================================================
+  # Terraform Format and Validate
+  # ===========================================================================
+  terraform-lint:
+    name: Terraform Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+        working-directory: infrastructure/terraform
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: infrastructure/terraform
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: infrastructure/terraform
+
+  # ===========================================================================
+  # Secret Detection: scan git history for leaked credentials
+  # ===========================================================================
+  gitleaks:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
+  # IaC Security: scan Terraform for misconfigurations
+  # ===========================================================================
+  checkov:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infrastructure/terraform
+          framework: terraform
+          # === Checks ===
+          # 1: "Ensure IAM policies that allow full “-” administrative privileges are not created"
+          # 2: "Ensure ALB protocol is HTTPS"
+          # 16: "Ensure all data stored in the RDS is securely encrypted at rest"
+          # 20: "S3 Bucket has an ACL defined which allows public READ access"
+          # 23: "Ensure every security group rule has a description"
+          # 24: "Ensure no security groups allow ingress from 0.0.0.0:0 to port 22"
+          # 60: "Ensure IAM role allows only specific services or principals to assume it"
+          # 163: "Ensure ECR image scanning on push is enabled"
+          check: CKV_AWS_1,CKV_AWS_2,CKV_AWS_16,CKV_AWS_20,CKV_AWS_23,CKV_AWS_24,CKV_AWS_60,CKV_AWS_163
+          quiet: true
+          output_format: github_failed_only
+
+  # ===========================================================================
+  # Container Security: build and scan Docker images for CVEs
+  # ===========================================================================
+  trivy:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t secops-app ./application/backend
+
+      - name: Build db-init image
+        run: docker build -t secops-db-init ./infrastructure/scripts/db-init
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: secops-app
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+      - name: Scan db-init image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: secops-db-init
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+
+  # ===========================================================================
+  # Terraform Plan: show what will change in AWS
+  # ===========================================================================
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: [terraform-lint, gitleaks, checkov, trivy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::124355647999:role/secops-pipeline-github-actions-plan
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: infrastructure/terraform
+
+      - name: Terraform Plan
+        run: terraform plan -no-color
+        working-directory: infrastructure/terraform
