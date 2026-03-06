@@ -1,4 +1,4 @@
-FROM postgres:17-alpine
+FROM postgres:16-alpine
 
 WORKDIR /db-init
 
