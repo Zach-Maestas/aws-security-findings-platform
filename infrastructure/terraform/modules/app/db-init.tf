@@ -26,7 +26,6 @@ resource "aws_iam_role" "ecs_exec_db_init" {
     ]
   })
 
-
   tags = {
     Name = "${var.project}-ecs-exec-db-init-role"
   }
