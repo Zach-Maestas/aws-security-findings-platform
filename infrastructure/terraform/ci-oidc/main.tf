@@ -11,7 +11,7 @@ Note: This module's state is stored locally. It exists as a separate bootstrap
 workspace that must be applied before the main infrastructure. OIDC least privilege
 isn't strictly required for a personal project, but demonstrates production
 practices: prevents giving root access to GitHub Actions, prevents privilege escalation, 
-and centralizes the deployment pipeline steps.
+and prevents stored AWS credentials.
 ==============================================================================
 */
 
