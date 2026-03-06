@@ -90,3 +90,9 @@ variable "api_desired_count" {
   type        = number
   default     = 0
 }
+
+variable "permissions_boundary_arn" {
+  description = "ARN of the permissions boundary to attach to IAM roles"
+  type        = string
+  default     = null
+}

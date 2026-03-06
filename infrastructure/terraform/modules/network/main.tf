@@ -173,7 +173,8 @@ resource "aws_iam_role" "vpc_flow_logs" {
     ]
   })
 
-  tags = { Name = "${var.project}-vpc-flow-logs-role" }
+  permissions_boundary = var.permissions_boundary_arn
+  tags                 = { Name = "${var.project}-vpc-flow-logs-role" }
 }
 
 resource "aws_iam_role_policy" "vpc_flow_logs" {

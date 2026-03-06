@@ -27,6 +27,7 @@ module "network" {
   public_subnet_cidrs      = var.public_subnet_cidrs
   private_app_subnet_cidrs = var.private_app_subnet_cidrs
   private_db_subnet_cidrs  = var.private_db_subnet_cidrs
+  permissions_boundary_arn = var.permissions_boundary_arn
 }
 
 # ACM Certificate
@@ -54,8 +55,9 @@ module "data" {
 
 # Application Module
 module "app" {
-  source                 = "./modules/app"
-  project                = var.project
+  source                  = "./modules/app"
+  project                 = var.project
+  permissions_boundary_arn = var.permissions_boundary_arn
   vpc_id                 = module.network.vpc_id
   public_subnet_ids      = module.network.public_subnet_ids
   private_app_subnet_ids = module.network.private_app_subnet_ids
@@ -74,7 +76,8 @@ module "app" {
 
 # Security & Operations Module
 module "security_ops" {
-  source      = "./modules/security-ops"
-  project     = var.project
-  alert_email = var.alert_email
+  source                  = "./modules/security-ops"
+  project                 = var.project
+  alert_email             = var.alert_email
+  permissions_boundary_arn = var.permissions_boundary_arn
 }
