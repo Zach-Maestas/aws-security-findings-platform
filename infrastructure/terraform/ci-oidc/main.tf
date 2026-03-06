@@ -256,8 +256,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
 
   # ECS: manage clusters, services, task definitions
   statement {
-    sid    = "ECS"
-    effect = "Allow"
+    sid     = "ECS"
+    effect  = "Allow"
     actions = ["ecs:*"]
     resources = [
       "arn:aws:ecs:${local.region}:${local.account_id}:cluster/${local.project}-*",
@@ -281,9 +281,9 @@ data "aws_iam_policy_document" "deploy_permissions" {
 
   # RDS
   statement {
-    sid       = "RDS"
-    effect    = "Allow"
-    actions   = ["rds:*"]
+    sid     = "RDS"
+    effect  = "Allow"
+    actions = ["rds:*"]
     resources = [
       "arn:aws:rds:${local.region}:${local.account_id}:db:${local.project}-*",
       "arn:aws:rds:${local.region}:${local.account_id}:subgrp:${local.project}-*",
@@ -465,8 +465,8 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
 
   # Route 53
   statement {
-    sid     = "Route53"
-    effect  = "Allow"
+    sid    = "Route53"
+    effect = "Allow"
     actions = [
       "route53:ChangeResourceRecordSets", "route53:GetHostedZone",
       "route53:ListResourceRecordSets", "route53:GetChange",
@@ -477,8 +477,8 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
 
   # ACM
   statement {
-    sid     = "ACM"
-    effect  = "Allow"
+    sid    = "ACM"
+    effect = "Allow"
     actions = [
       "acm:RequestCertificate", "acm:DeleteCertificate",
       "acm:DescribeCertificate", "acm:ListCertificates",
@@ -489,9 +489,9 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
 
   # S3 for CloudTrail logs bucket
   statement {
-    sid       = "S3CloudTrail"
-    effect    = "Allow"
-    actions   = ["s3:*"]
+    sid     = "S3CloudTrail"
+    effect  = "Allow"
+    actions = ["s3:*"]
     resources = [
       "arn:aws:s3:::${local.project}-*",
       "arn:aws:s3:::${local.project}-*/*"
@@ -500,9 +500,9 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
 
   # KMS
   statement {
-    sid     = "KMS"
-    effect  = "Allow"
-    actions = ["kms:Describe*", "kms:List*", "kms:GetKeyPolicy"]
+    sid       = "KMS"
+    effect    = "Allow"
+    actions   = ["kms:Describe*", "kms:List*", "kms:GetKeyPolicy"]
     resources = ["*"]
   }
 }
