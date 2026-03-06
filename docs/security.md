@@ -158,19 +158,104 @@ CloudTrail → EventBridge (AuthorizeSecurityGroupIngress) → Lambda → ec2:Re
 
 ---
 
+## DevSecOps Pipeline Security Gates (Phase 3)
+
+### Pipeline Architecture
+
+PR security checks run automatically on every pull request to `main`. All gates must pass before the Terraform Plan step executes.
+
+```
+PR opened → [Terraform Lint] → [Secret Detection] → [IaC Security Scan] → [Container Security Scan] → Terraform Plan
+```
+
+### OIDC Authentication
+
+GitHub Actions authenticates to AWS using OpenID Connect — no stored AWS credentials.
+
+```
+GitHub Actions → OIDC token → AWS STS AssumeRoleWithWebIdentity → short-lived session credentials
+```
+
+The setup grants the ability for the GitHub Actions runner to authenticate to AWS via OIDC –  which involves GitHub issuing a signed OIDC ID token that proves the workflow's identity, and AWS STS exchanges that token for temporary IAM credentials. The IAM trust policy restricts role assumption to this specific repository. Also, the role granted to the GitHub Actions runner is least-privilege scoped, including a permissions boundary attached to prevent privilege escalation if one of the IAM roles were to be compromised. 
+
+### Security Gates
+
+#### Terraform Lint
+
+Validates Terraform formatting (`fmt -check`) and configuration (`validate`) to catch syntax and structural issues before any security scanning.
+
+#### Secret Detection (Gitleaks)
+
+Scans full git history for leaked credentials — API keys, passwords, tokens.
+
+**Evidence:**
+
+<img src="./screenshots/phase3/gitleaks_success.png" height="800" width="800" />
+
+#### IaC Security Scan (Checkov)
+
+Static analysis on Terraform for security misconfigurations. Scoped to specific high-value checks:
+
+| Check ID | What It Catches |
+|----------|----------------|
+| CKV_AWS_1 | IAM policies with full admin `*` privileges |
+| CKV_AWS_2 | ALB not using HTTPS |
+| CKV_AWS_16 | RDS not encrypted at rest |
+| CKV_AWS_20 | S3 bucket with public READ ACL |
+| CKV_AWS_23 | Security group rules without descriptions |
+| CKV_AWS_24 | Security group allowing `0.0.0.0/0` to port 22 |
+| CKV_AWS_60 | IAM role assumable by overly broad principals |
+| CKV_AWS_163 | ECR image scanning on push not enabled |
+
+**Evidence:**
+
+<img src="./screenshots/phase3/checkov_failure.png" height="800" width="800" />
+<img src="./screenshots/phase3/checkov_success.png" height="800" width="800" />
+
+#### Container Security Scan (Trivy)
+
+Builds Docker images and scans for known CVEs at `CRITICAL` and `HIGH` severity. Unfixed vulnerabilities are excluded (`ignore-unfixed`) to avoid blocking on upstream patches not yet available.
+
+**Evidence:**
+
+<img src="./screenshots/phase3/trivy_failure_v1_1.png" height="800" width="800" />
+<img src="./screenshots/phase3/trivy_failure_v1_2.png" height="800" width="800" />
+<img src="./screenshots/phase3/trivy_failure_v2.png" height="800" width="800" />
+<img src="./screenshots/phase3/trivy_success.png" height="800" width="800" />
+
+### Vulnerability Remediation Lifecycle
+
+**Checkov — Misconfigurations**
+
+Checkov detected that Security Group rules didn't have descriptions (`CKV_AWS_23`) and that ECR image scanning on push wasn't enabled (`CKV_AWS_163`). Both were easy fixes in Terraform.
+
+**Trivy — Base Image CVEs**
+
+Trivy flagged CVEs in the `python:3.11-slim` base image in the Flask app. The image was upgraded to `python:3.13-slim` with `--upgrade pip setuptools wheel` added to the Dockerfile. It also detected CVEs in the `postgres:16-alpine` base, and upgrading to `postgres:17-alpine` resolved those.
+
+**Trivy — Upstream Unfixed (Accepted Risk)**
+
+After upgrading, Trivy still found CVEs in the Postgres image. The `gosu` binary was compiled with an outdated Go version. These are **upstream unfixed** — they can't be patched until the maintainers rebuild with a newer Go release. These CVEs are accepted via `.trivyignore` because the db-init container runs in a private subnet with no internet-facing exposure.
+
+### Terraform Plan
+
+Runs only after all security gates pass. Uses OIDC credentials to execute `terraform plan` against live state, surfacing infrastructure drift and validating changes.
+
+### All Gates Passing
+
+<img src="./screenshots/phase3/pipeline_success.png" height="800" width="800" />
+
+---
+
 ## What This Architecture Does NOT Include (Yet)
 
-These are planned for future phases and documented here for transparency:
-
-| Gap | Planned Phase | Notes |
-|-----|--------------|-------|
-| Container image scanning | Phase 3 | No vulnerability scanning on images |
-| IaC scanning (tfsec/checkov) | Phase 3 | No static analysis on Terraform |
-| Secret detection in code | Phase 3 | No pre-commit or CI secret scanning |
+| Gap | Phase | Notes |
+|-----|-------|-------|
 | Trust policy change detection | Future | Alert on `UpdateAssumeRolePolicy` for unexpected trust modifications |
 | Encryption at rest (RDS/KMS) | Future | RDS uses default encryption, not CMK |
 | WAF on ALB | Future | No web application firewall layer |
 | VPC Flow Logs | Future | No network traffic logging |
+| SAST | Future | No static application security testing |
 
 ---
 
