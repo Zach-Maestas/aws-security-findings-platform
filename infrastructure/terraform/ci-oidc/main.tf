@@ -148,6 +148,7 @@ data "aws_iam_policy_document" "plan_permissions" {
       "iam:List*",
       "secretsmanager:Describe*",
       "secretsmanager:GetSecretValue",
+      "secretsmanager:GetResourcePolicy",
       "elasticloadbalancing:Describe*",
       "logs:Describe*",
       "logs:GetLogEvents",
@@ -155,13 +156,15 @@ data "aws_iam_policy_document" "plan_permissions" {
       "logs:ListTagsLogGroup",
       "cloudtrail:Describe*",
       "cloudtrail:GetTrailStatus",
+      "cloudtrail:ListTags",
+      "cloudtrail:GetEventSelectors",
+      "cloudtrail:GetInsightSelectors",
       "guardduty:Get*",
       "guardduty:List*",
       "securityhub:Describe*",
       "securityhub:Get*",
-      "lambda:GetFunction",
-      "lambda:GetPolicy",
-      "lambda:ListFunctions",
+      "lambda:Get*",
+      "lambda:List*",
       "events:Describe*",
       "events:List*",
       "sns:Get*",
@@ -276,7 +279,7 @@ data "aws_iam_policy_document" "deploy_permissions" {
     actions = [
       "ec2:*Vpc*", "ec2:*Subnet*", "ec2:*RouteTable*", "ec2:*Route",
       "ec2:*InternetGateway*", "ec2:*NatGateway*", "ec2:*SecurityGroup*",
-      "ec2:*Address*", "ec2:*NetworkAcl*", "ec2:*Tags*",
+      "ec2:*Address*", "ec2:*NetworkAcl*", "ec2:*Tags*", "ec2:*FlowLog*",
       "ec2:Describe*", "ec2:AllocateAddress", "ec2:ReleaseAddress"
     ]
     resources = ["*"]
@@ -345,7 +348,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
     ]
     resources = [
       "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}-*",
-      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}/*"
+      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}/*",
+      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:rds!*"
     ]
   }
 
@@ -389,15 +393,9 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
     sid    = "CloudTrail"
     effect = "Allow"
     actions = [
-      "cloudtrail:CreateTrail", "cloudtrail:UpdateTrail",
-      "cloudtrail:DeleteTrail", "cloudtrail:StartLogging",
-      "cloudtrail:StopLogging", "cloudtrail:Describe*",
-      "cloudtrail:GetTrailStatus", "cloudtrail:PutEventSelectors",
-      "cloudtrail:AddTags"
+      "cloudtrail:*"
     ]
-    resources = [
-      "arn:aws:cloudtrail:${local.region}:${local.account_id}:trail/${local.project}-*"
-    ]
+    resources = ["*"]
   }
 
   # GuardDuty
@@ -431,12 +429,7 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
     sid    = "Lambda"
     effect = "Allow"
     actions = [
-      "lambda:CreateFunction", "lambda:DeleteFunction",
-      "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
-      "lambda:GetFunction", "lambda:GetPolicy",
-      "lambda:AddPermission", "lambda:RemovePermission",
-      "lambda:ListFunctions", "lambda:TagResource",
-      "lambda:PublishVersion"
+      "lambda:*"
     ]
     resources = [
       "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.project}-*"
