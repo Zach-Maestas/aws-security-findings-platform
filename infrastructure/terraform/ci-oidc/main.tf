@@ -355,13 +355,20 @@ data "aws_iam_policy_document" "deploy_permissions" {
     effect = "Allow"
     actions = [
       "logs:CreateLogGroup", "logs:DeleteLogGroup",
-      "logs:PutRetentionPolicy", "logs:Describe*",
-      "logs:TagResource", "logs:ListTagsLogGroup"
+      "logs:PutRetentionPolicy", "logs:TagResource",
+      "logs:ListTagsLogGroup", "logs:ListTagsForResource"
     ]
     resources = [
       "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*",
       "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*:*"
     ]
+  }
+
+  statement {
+    sid       = "CloudWatchLogsDescribe"
+    effect    = "Allow"
+    actions   = ["logs:Describe*"]
+    resources = ["*"]
   }
 
 }
