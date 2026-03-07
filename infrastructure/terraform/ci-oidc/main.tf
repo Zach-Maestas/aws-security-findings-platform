@@ -141,7 +141,8 @@ data "aws_iam_policy_document" "plan_permissions" {
       "ecr:List*",
       "ecr:GetAuthorizationToken",
       "rds:Describe*",
-      "s3:GetBucket*",
+      "rds:ListTagsForResource",
+      "s3:Get*",
       "s3:ListBucket",
       "iam:Get*",
       "iam:List*",
@@ -150,6 +151,8 @@ data "aws_iam_policy_document" "plan_permissions" {
       "elasticloadbalancing:Describe*",
       "logs:Describe*",
       "logs:GetLogEvents",
+      "logs:ListTagsForResource",
+      "logs:ListTagsLogGroup",
       "cloudtrail:Describe*",
       "cloudtrail:GetTrailStatus",
       "guardduty:Get*",
@@ -223,34 +226,31 @@ resource "aws_iam_role" "github_actions_deploy" {
 
 # Deploy role: provisioning permissions for terraform apply
 data "aws_iam_policy_document" "deploy_permissions" {
-  # ECR: authenticate and push images
+  # ECR + ECS global (actions that don't support resource-level ARNs)
   statement {
-    sid    = "ECRAuth"
+    sid    = "ECRECSGlobal"
     effect = "Allow"
     actions = [
-      "ecr:GetAuthorizationToken"
+      "ecr:GetAuthorizationToken",
+      "ecs:CreateCluster",
+      "ecs:RegisterTaskDefinition",
+      "ecs:DeregisterTaskDefinition",
+      "ecs:DescribeTaskDefinition",
+      "ecs:ListTaskDefinitions"
     ]
     resources = ["*"]
   }
 
   statement {
-    sid    = "ECRPush"
+    sid    = "ECR"
     effect = "Allow"
     actions = [
-      "ecr:PutImage",
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:InitiateLayerUpload",
-      "ecr:UploadLayerPart",
-      "ecr:CompleteLayerUpload",
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-      "ecr:Describe*",
-      "ecr:List*",
-      "ecr:CreateRepository",
-      "ecr:DeleteRepository",
-      "ecr:TagResource",
-      "ecr:PutLifecyclePolicy",
-      "ecr:PutImageTagMutability"
+      "ecr:PutImage", "ecr:BatchCheckLayerAvailability",
+      "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
+      "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
+      "ecr:Describe*", "ecr:List*",
+      "ecr:CreateRepository", "ecr:DeleteRepository",
+      "ecr:TagResource", "ecr:PutLifecyclePolicy", "ecr:PutImageTagMutability"
     ]
     resources = [
       "arn:aws:ecr:${local.region}:${local.account_id}:repository/${local.project}-*"
@@ -259,29 +259,14 @@ data "aws_iam_policy_document" "deploy_permissions" {
 
   # ECS: manage clusters, services, task definitions
   statement {
-    sid    = "ECS"
-    effect = "Allow"
-    actions = [
-      "ecs:*"
-    ]
+    sid     = "ECS"
+    effect  = "Allow"
+    actions = ["ecs:*"]
     resources = [
       "arn:aws:ecs:${local.region}:${local.account_id}:cluster/${local.project}-*",
       "arn:aws:ecs:${local.region}:${local.account_id}:service/${local.project}-*/*",
       "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${local.project}-*:*"
     ]
-  }
-
-  statement {
-    sid    = "ECSGlobal"
-    effect = "Allow"
-    actions = [
-      "ecs:CreateCluster",
-      "ecs:RegisterTaskDefinition",
-      "ecs:DeregisterTaskDefinition",
-      "ecs:DescribeTaskDefinition",
-      "ecs:ListTaskDefinitions"
-    ]
-    resources = ["*"]
   }
 
   # VPC + Networking
@@ -299,23 +284,20 @@ data "aws_iam_policy_document" "deploy_permissions" {
 
   # RDS
   statement {
-    sid    = "RDS"
-    effect = "Allow"
-    actions = [
-      "rds:*"
-    ]
+    sid     = "RDS"
+    effect  = "Allow"
+    actions = ["rds:*"]
     resources = [
       "arn:aws:rds:${local.region}:${local.account_id}:db:${local.project}-*",
-      "arn:aws:rds:${local.region}:${local.account_id}:subgrp:${local.project}-*"
+      "arn:aws:rds:${local.region}:${local.account_id}:subgrp:${local.project}-*",
+      "arn:aws:rds:${local.region}:${local.account_id}:pg:${local.project}-*"
     ]
   }
 
   statement {
-    sid    = "RDSDescribe"
-    effect = "Allow"
-    actions = [
-      "rds:Describe*"
-    ]
+    sid       = "RDSDescribe"
+    effect    = "Allow"
+    actions   = ["rds:Describe*"]
     resources = ["*"]
   }
 
@@ -362,7 +344,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "secretsmanager:GetResourcePolicy", "secretsmanager:PutResourcePolicy"
     ]
     resources = [
-      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}-*"
+      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}-*",
+      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}/*"
     ]
   }
 
@@ -376,11 +359,24 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "logs:TagResource", "logs:ListTagsLogGroup"
     ]
     resources = [
-      "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/*/${local.project}-*",
-      "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/*/${local.project}-*:*"
+      "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*",
+      "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*:*"
     ]
   }
 
+}
+
+resource "aws_iam_policy" "deploy_permissions" {
+  name        = "${local.project}-github-actions-deploy-permissions"
+  description = "Infrastructure provisioning permissions for terraform apply"
+  policy      = data.aws_iam_policy_document.deploy_permissions.json
+}
+
+# =============================================================================
+# Deploy Role: Security operations permissions (split to stay under 6144 limit)
+# =============================================================================
+
+data "aws_iam_policy_document" "deploy_security_permissions" {
   # CloudTrail
   statement {
     sid    = "CloudTrail"
@@ -417,6 +413,7 @@ data "aws_iam_policy_document" "deploy_permissions" {
     actions = [
       "securityhub:EnableSecurityHub", "securityhub:DisableSecurityHub",
       "securityhub:Describe*", "securityhub:Get*",
+      "securityhub:UpdateSecurityHubConfiguration",
       "securityhub:BatchEnableStandards", "securityhub:BatchDisableStandards"
     ]
     resources = ["*"]
@@ -474,10 +471,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
     sid    = "Route53"
     effect = "Allow"
     actions = [
-      "route53:ChangeResourceRecordSets",
-      "route53:GetHostedZone",
-      "route53:ListResourceRecordSets",
-      "route53:GetChange",
+      "route53:ChangeResourceRecordSets", "route53:GetHostedZone",
+      "route53:ListResourceRecordSets", "route53:GetChange",
       "route53:ListHostedZones"
     ]
     resources = ["*"]
@@ -497,44 +492,28 @@ data "aws_iam_policy_document" "deploy_permissions" {
 
   # S3 for CloudTrail logs bucket
   statement {
-    sid    = "S3CloudTrail"
-    effect = "Allow"
-    actions = [
-      "s3:CreateBucket", "s3:DeleteBucket",
-      "s3:PutBucketPolicy", "s3:GetBucketPolicy",
-      "s3:PutBucketPublicAccessBlock", "s3:GetBucketPublicAccessBlock",
-      "s3:GetBucketAcl", "s3:GetBucketVersioning",
-      "s3:PutBucketVersioning", "s3:GetBucketLogging",
-      "s3:GetBucketLocation", "s3:ListBucket",
-      "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
-      "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration",
-      "s3:GetBucketTagging", "s3:PutBucketTagging",
-      "s3:GetAccelerateConfiguration", "s3:GetBucketCORS",
-      "s3:GetBucketObjectLockConfiguration", "s3:GetBucketRequestPayment",
-      "s3:GetBucketWebsite", "s3:GetReplicationConfiguration",
-      "s3:GetObject", "s3:PutObject"
-    ]
+    sid     = "S3CloudTrail"
+    effect  = "Allow"
+    actions = ["s3:*"]
     resources = [
       "arn:aws:s3:::${local.project}-*",
       "arn:aws:s3:::${local.project}-*/*"
     ]
   }
 
-  # KMS (if used for encryption)
+  # KMS
   statement {
-    sid    = "KMS"
-    effect = "Allow"
-    actions = [
-      "kms:Describe*", "kms:List*", "kms:GetKeyPolicy"
-    ]
+    sid       = "KMS"
+    effect    = "Allow"
+    actions   = ["kms:Describe*", "kms:List*", "kms:GetKeyPolicy"]
     resources = ["*"]
   }
 }
 
-resource "aws_iam_policy" "deploy_permissions" {
-  name        = "${local.project}-github-actions-deploy-permissions"
-  description = "Provisioning permissions for terraform apply on merge to main"
-  policy      = data.aws_iam_policy_document.deploy_permissions.json
+resource "aws_iam_policy" "deploy_security_permissions" {
+  name        = "${local.project}-github-actions-deploy-security"
+  description = "Security operations permissions for terraform apply"
+  policy      = data.aws_iam_policy_document.deploy_security_permissions.json
 }
 
 resource "aws_iam_role_policy_attachment" "deploy_state" {
@@ -545,6 +524,11 @@ resource "aws_iam_role_policy_attachment" "deploy_state" {
 resource "aws_iam_role_policy_attachment" "deploy_permissions" {
   role       = aws_iam_role.github_actions_deploy.name
   policy_arn = aws_iam_policy.deploy_permissions.arn
+}
+
+resource "aws_iam_role_policy_attachment" "deploy_security_permissions" {
+  role       = aws_iam_role.github_actions_deploy.name
+  policy_arn = aws_iam_policy.deploy_security_permissions.arn
 }
 
 # =============================================================================

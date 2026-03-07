@@ -26,6 +26,8 @@ resource "aws_iam_role" "ecs_exec_db_init" {
     ]
   })
 
+  permissions_boundary = var.permissions_boundary_arn
+
   tags = {
     Name = "${var.project}-ecs-exec-db-init-role"
   }

@@ -118,6 +118,8 @@ resource "aws_iam_role" "cloudtrail_cloudwatch_role" {
     ]
   })
 
+  permissions_boundary = var.permissions_boundary_arn
+
   tags = {
     Name = "${var.project}-cloudtrail-cloudwatch-role"
   }
@@ -239,6 +241,8 @@ resource "aws_iam_role" "lambda_exec_role" {
       }
     ]
   })
+
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 # IAM Policy to allow Lambda remediation actions (IAM, EC2, CloudWatch Logs)
