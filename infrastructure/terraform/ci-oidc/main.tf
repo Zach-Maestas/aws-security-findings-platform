@@ -268,7 +268,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
     resources = [
       "arn:aws:ecs:${local.region}:${local.account_id}:cluster/${local.project}-*",
       "arn:aws:ecs:${local.region}:${local.account_id}:service/${local.project}-*/*",
-      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${local.project}-*:*"
+      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${local.project}-*:*",
+      "arn:aws:ecs:${local.region}:${local.account_id}:task/${local.project}-*/*"
     ]
   }
 
