@@ -393,12 +393,7 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
     sid    = "CloudTrail"
     effect = "Allow"
     actions = [
-      "cloudtrail:CreateTrail", "cloudtrail:UpdateTrail",
-      "cloudtrail:DeleteTrail", "cloudtrail:StartLogging",
-      "cloudtrail:StopLogging", "cloudtrail:Describe*",
-      "cloudtrail:GetTrailStatus", "cloudtrail:GetEventSelectors",
-      "cloudtrail:PutEventSelectors", "cloudtrail:AddTags",
-      "cloudtrail:GetInsightSelectors"
+      "cloudtrail:*"
     ]
     resources = ["*"]
   }
@@ -434,12 +429,7 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
     sid    = "Lambda"
     effect = "Allow"
     actions = [
-      "lambda:CreateFunction", "lambda:DeleteFunction",
-      "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration",
-      "lambda:GetFunction", "lambda:GetPolicy",
-      "lambda:AddPermission", "lambda:RemovePermission",
-      "lambda:ListFunctions", "lambda:ListVersionsByFunction",
-      "lambda:TagResource", "lambda:PublishVersion"
+      "lambda:*"
     ]
     resources = [
       "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.project}-*"
