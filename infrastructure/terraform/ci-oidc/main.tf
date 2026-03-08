@@ -46,7 +46,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   ]
 
   tags = {
-    Name = "github-actions-oidc-provider"
+    Name = "${local.project}-oidc-provider"
   }
 }
 
@@ -96,6 +96,10 @@ resource "aws_iam_policy" "terraform_state" {
   name        = "${local.project}-terraform-state-access"
   description = "S3 and DynamoDB access for Terraform remote state"
   policy      = data.aws_iam_policy_document.terraform_state.json
+
+  tags = {
+    Name = "${local.project}-terraform-state-access"
+  }
 }
 
 # =============================================================================
@@ -125,6 +129,10 @@ resource "aws_iam_role" "github_actions_plan" {
       }
     ]
   })
+
+  tags = {
+    Name = "${local.project}-github-actions-plan"
+  }
 }
 
 # Plan role: read-only access for terraform plan
@@ -184,6 +192,10 @@ resource "aws_iam_policy" "plan_permissions" {
   name        = "${local.project}-github-actions-plan-permissions"
   description = "Read-only permissions for terraform plan in PR workflows"
   policy      = data.aws_iam_policy_document.plan_permissions.json
+
+  tags = {
+    Name = "${local.project}-github-actions-plan-permissions"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "plan_state" {
@@ -225,6 +237,10 @@ resource "aws_iam_role" "github_actions_deploy" {
   })
 
   permissions_boundary = local.permissions_boundary_arn
+
+  tags = {
+    Name = "${local.project}-github-actions-deploy"
+  }
 }
 
 # Deploy role: provisioning permissions for terraform apply
@@ -382,6 +398,10 @@ resource "aws_iam_policy" "deploy_permissions" {
   name        = "${local.project}-github-actions-deploy-permissions"
   description = "Infrastructure provisioning permissions for terraform apply"
   policy      = data.aws_iam_policy_document.deploy_permissions.json
+
+  tags = {
+    Name = "${local.project}-github-actions-deploy-permissions"
+  }
 }
 
 # =============================================================================
@@ -515,6 +535,10 @@ resource "aws_iam_policy" "deploy_security_permissions" {
   name        = "${local.project}-github-actions-deploy-security"
   description = "Security operations permissions for terraform apply"
   policy      = data.aws_iam_policy_document.deploy_security_permissions.json
+
+  tags = {
+    Name = "${local.project}-github-actions-deploy-security"
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "deploy_state" {
@@ -609,4 +633,8 @@ resource "aws_iam_policy" "deploy_permissions_boundary" {
   name        = "${local.project}-deploy-permissions-boundary"
   description = "Permissions boundary preventing privilege escalation from deploy role"
   policy      = data.aws_iam_policy_document.deploy_permissions_boundary.json
+
+  tags = {
+    Name = "${local.project}-deploy-permissions-boundary"
+  }
 }

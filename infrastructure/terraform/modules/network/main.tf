@@ -159,6 +159,7 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   tags              = { Name = "${var.project}-vpc-flow-logs" }
 }
 
+# IAM Role for VPC Flow Logs — allows the flow log service to write to CloudWatch
 resource "aws_iam_role" "vpc_flow_logs" {
   name = "${var.project}-vpc-flow-logs-role"
 
@@ -177,6 +178,7 @@ resource "aws_iam_role" "vpc_flow_logs" {
   tags                 = { Name = "${var.project}-vpc-flow-logs-role" }
 }
 
+# Inline policy granting CloudWatch Logs write access for VPC Flow Logs
 resource "aws_iam_role_policy" "vpc_flow_logs" {
   name = "${var.project}-vpc-flow-logs-policy"
   role = aws_iam_role.vpc_flow_logs.id
