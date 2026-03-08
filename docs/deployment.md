@@ -32,7 +32,7 @@ Detailed steps for deploying, verifying, and tearing down the infrastructure. Fo
 
 3. **Route 53 hosted zone** — a hosted zone must exist for your domain. The ACM module uses DNS validation against it.
 
-4. **Terraform state backend** — state is stored locally by default. For shared/remote state, configure an S3 backend in `infrastructure/terraform/main.tf`.
+4. **Terraform state backend** — remote state is stored in S3 with DynamoDB locking. The backend is bootstrapped via `infrastructure/terraform/backend-state-init/`.
 
 ---
 
@@ -91,7 +91,7 @@ curl https://api.zachmaestas-capstone.com/items
 - **ECS** — cluster shows 1 running task, no stopped tasks with errors
 - **ALB** — target group shows healthy targets
 - **RDS** — instance status is "Available"
-- **CloudWatch Logs** — `/ecs/devsecops-security-ops-api-task` shows Flask startup logs
+- **CloudWatch Logs** — `/ecs/secops-pipeline-app` shows Flask startup logs
 
 ---
 
@@ -130,11 +130,59 @@ This rebuilds images, scales down, and scales back up — without re-running Ter
 
 ---
 
+## CI/CD Deployment (GitHub Actions)
+
+Infrastructure can also be deployed automatically through GitHub Actions using OIDC authentication — no stored AWS credentials.
+
+### Pipeline Strategy
+
+| Workflow | Trigger | Role | Purpose |
+|----------|---------|------|---------|
+| `pr-checks.yml` | Pull request to `main` | `secops-pipeline-github-actions-plan` (read-only) | Security scans + `terraform plan` |
+| `deploy.yml` | Manual dispatch (or merge to `main`) | `secops-pipeline-github-actions-deploy` (write) | `terraform apply` + build + deploy |
+
+### Deploy Workflow Steps
+
+```
+OIDC Auth → Terraform Apply → Docker Build & Push → DB Init → Scale Up ECS
+```
+
+1. **Authenticate** — GitHub Actions requests an OIDC token, AWS STS exchanges it for temporary credentials scoped to the deploy role
+2. **Terraform Apply** — provisions all infrastructure (VPC, ECS, RDS, ALB, ECR, etc.)
+3. **Build & Push** — builds Docker images and pushes to ECR
+4. **DB Init** — runs a one-off ECS task to initialize the database schema
+5. **Scale Up** — sets the ECS API service desired count to 1
+
+### Enabling Auto-Deploy on Merge
+
+The deploy workflow is configured for manual dispatch (`workflow_dispatch`). To enable auto-deploy when PRs merge to `main`, uncomment the `push` trigger in `.github/workflows/deploy.yml`:
+
+```yaml
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/terraform/**'
+      - 'application/**'
+      - '.github/workflows/deploy.yml'
+```
+
+The `paths` filter ensures deploys only trigger when infrastructure or application code changes — not on documentation or CI config edits.
+
+### Security Controls
+
+- **OIDC federation** — no long-lived AWS credentials stored in GitHub
+- **Separate roles** — plan role is read-only, deploy role has write access with a permissions boundary
+- **Permissions boundary** — caps what the deploy role and any roles it creates can do, preventing privilege escalation
+- **PR gates** — security scans must pass before `terraform plan` runs; deploy only happens after merge
+
+---
+
 ## Troubleshooting
 
 | Symptom | Check | Fix |
 |---------|-------|-----|
-| ECS task keeps stopping | `make logs` or CloudWatch `/ecs/devsecops-security-ops-api-task` | Check container exit code and error message |
+| ECS task keeps stopping | `make logs` or CloudWatch `/ecs/secops-pipeline-app` | Check container exit code and error message |
 | ALB target unhealthy | Target group health check in AWS Console | Verify `/health` returns 200, security groups allow ALB → ECS |
 | DB connection refused | ECS task logs for connection errors | Check RDS security group allows inbound from ECS SG on port 5432 |
 | Terraform apply fails | Terraform error output | Common: state drift, resource limits, permission denied |
