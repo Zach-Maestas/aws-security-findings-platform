@@ -155,7 +155,6 @@ data "aws_iam_policy_document" "plan_permissions" {
       "iam:Get*",
       "iam:List*",
       "secretsmanager:Describe*",
-      "secretsmanager:GetSecretValue",
       "secretsmanager:GetResourcePolicy",
       "elasticloadbalancing:Describe*",
       "logs:Describe*",

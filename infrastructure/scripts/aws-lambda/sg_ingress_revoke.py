@@ -25,25 +25,28 @@ DANGEROUS_CIDRS = {"0.0.0.0/0", "::/0"}
 # Revoke each dangerous rule from the security group via boto3
 def revoke_dangerous_rules(sg_id, rules):
     for rule in rules:
+        permission = {
+            "IpProtocol": rule["ipProtocol"],
+            "IpRanges": [{"CidrIp": r["cidrIp"]} for r in rule.get("ipRanges", {}).get("items", [])],
+            "Ipv6Ranges": [{"CidrIpv6": r["cidrIpv6"]} for r in rule.get("ipv6Ranges", {}).get("items", [])]
+        }
+
+        # Protocol -1 (all traffic) has no port fields
+        if rule.get("ipProtocol") != "-1":
+            permission["FromPort"] = rule["fromPort"]
+            permission["ToPort"] = rule["toPort"]
+
         ec2.revoke_security_group_ingress(
             GroupId=sg_id,
-            IpPermissions=[
-                {
-                    "IpProtocol": rule["ipProtocol"],
-                    "FromPort": rule["fromPort"],
-                    "ToPort": rule["toPort"],
-                    "IpRanges": [{"CidrIp": r["cidrIp"]} for r in rule.get("ipRanges", {}).get("items", [])],
-                    "Ipv6Ranges": [{"CidrIpv6": r["cidrIpv6"]} for r in rule.get("ipv6Ranges", {}).get("items", [])]
-                }
-            ]
+            IpPermissions=[permission]
         )
 
+        port_range = "ALL" if rule.get("ipProtocol") == "-1" else f"{rule['fromPort']}-{rule['toPort']}"
         logger.info(
-            "✅ Security Group Rule Revoked:\n[SG ID: %s]\n[IP Protocol: %s]\n[Port Range: %d-%d]\n[IPv4 CIDRs: %s]\n[IPv6 CIDRS: %s]", 
-            sg_id, 
-            rule["ipProtocol"], 
-            rule["fromPort"],
-            rule["toPort"],
+            "✅ Security Group Rule Revoked:\n[SG ID: %s]\n[IP Protocol: %s]\n[Port Range: %s]\n[IPv4 CIDRs: %s]\n[IPv6 CIDRS: %s]",
+            sg_id,
+            rule["ipProtocol"],
+            port_range,
             [r["cidrIp"] for r in rule.get("ipRanges", {}).get("items", [])],
             [r["cidrIpv6"] for r in rule.get("ipv6Ranges", {}).get("items", [])]
             )
@@ -53,12 +56,20 @@ def get_dangerous_rules(ip_perms):
     dangerous_rules = []
 
     for item in ip_perms["items"]:
-        from_port, to_port = int(item["fromPort"]), int(item["toPort"])
         ipv4_cidrs = [r["cidrIp"] for r in item.get("ipRanges", {}).get("items", [])]
         ipv6_cidrs = [r["cidrIpv6"] for r in item.get("ipv6Ranges", {}).get("items", [])]
 
-        if any(from_port <= port <= to_port for port in DANGEROUS_PORTS) and \
-        any(cidr in ipv4_cidrs or cidr in ipv6_cidrs for cidr in DANGEROUS_CIDRS):
+        has_dangerous_cidr = any(cidr in ipv4_cidrs or cidr in ipv6_cidrs for cidr in DANGEROUS_CIDRS)
+        if not has_dangerous_cidr:
+            continue
+
+        # Protocol -1 means all traffic (all ports) — always dangerous with open CIDRs
+        if item.get("ipProtocol") == "-1":
+            dangerous_rules.append(item)
+            continue
+
+        from_port, to_port = int(item["fromPort"]), int(item["toPort"])
+        if any(from_port <= port <= to_port for port in DANGEROUS_PORTS):
             dangerous_rules.append(item)
         
     return dangerous_rules

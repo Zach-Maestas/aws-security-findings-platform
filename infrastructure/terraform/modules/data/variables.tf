@@ -3,11 +3,6 @@ variable "project" {
   type        = string
 }
 
-variable "vpc_id" {
-  description = "ID of the VPC"
-  type        = string
-}
-
 variable "private_db_subnet_ids" {
   description = "Private database subnet IDs from the network layer"
   type        = list(string)
@@ -26,7 +21,7 @@ variable "db_admin_username" {
 }
 
 variable "db_port" {
-  description = "Name of the database"
+  description = "Port number of the database"
   type        = number
   default     = 5432
 }
