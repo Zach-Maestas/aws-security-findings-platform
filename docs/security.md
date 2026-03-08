@@ -247,6 +247,32 @@ Runs only after all security gates pass. Uses OIDC credentials to execute `terra
 
 ---
 
+## Logging & Observability
+
+### RDS PostgreSQL Logging
+
+A custom parameter group enables database-level audit logging exported to CloudWatch:
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| `log_connections` | `1` | Track who connects to the database |
+| `log_disconnections` | `1` | Track session duration for anomaly detection |
+| `log_statement` | `ddl` | Log schema changes (CREATE, ALTER, DROP) — detects structural tampering |
+
+**Evidence:**
+
+<img src="./screenshots/phase2/cloudwatch_postgres_logs.png" height="800" width="800" />
+
+### VPC Flow Logs
+
+All network traffic in the VPC is logged to CloudWatch, capturing ACCEPT and REJECT records across all network interfaces. Flow logs are delivered via a dedicated IAM role scoped to the project's log group.
+
+**Evidence:**
+
+<img src="./screenshots/phase2/cloudwatch_vpc_flow_logs.png" height="800" width="800" />
+
+---
+
 ## What This Architecture Does NOT Include (Yet)
 
 | Gap | Phase | Notes |
@@ -254,7 +280,6 @@ Runs only after all security gates pass. Uses OIDC credentials to execute `terra
 | Trust policy change detection | Future | Alert on `UpdateAssumeRolePolicy` for unexpected trust modifications |
 | Encryption at rest (RDS/KMS) | Future | RDS uses default encryption, not CMK |
 | WAF on ALB | Future | No web application firewall layer |
-| VPC Flow Logs | Future | No network traffic logging |
 | SAST | Future | No static application security testing |
 
 ---
@@ -264,4 +289,6 @@ Runs only after all security gates pass. Uses OIDC credentials to execute `terra
 - **Single Lambda execution role** — both Lambdas share one role with IAM + EC2 + logging permissions. The SG Lambda has `iam:DetachRolePolicy` it doesn't need, and vice versa. Simpler to manage, but violates strict least privilege. In production, separate roles per function. 
 - **Broad EventBridge trigger for SG** — fires on every ingress change, not just dangerous ones. Necessary due to EventBridge limitations, negligible cost.  
 - **`security-group/*`** resource scope — Lambda can revoke rules on any SG in the account. Can't prefix-scope SG IDs like IAM roles.           
+- **Deploy role uses action wildcards** — `cloudtrail:*`, `lambda:*`, `s3:*` on the deploy role instead of exact actions. Necessary to stay under the 6,144-character AWS managed policy size limit. The permissions boundary caps effective permissions, but production would split into more granular policies or use inline policies.
 - **`force_destroy = true`** on CloudTrail S3 bucket — audit logs are deleted on terraform destroy. Convenient for teardown, but production requires retention protection.  
+- **`.trivyignore` for gosu CVEs** — Trivy flagged CVEs in the `gosu` binary compiled with an outdated Go version. It's used internally by the image's entrypoint to step down from root to the postgres user — upstream maintainers install it. Fixing it would require rebuilding the entire postgres base image with a newer Go compiler, which means maintaining a separate fork of the official image. Accepted risk: the db-init container runs in a private subnet with no internet-facing exposure.

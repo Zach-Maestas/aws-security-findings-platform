@@ -29,6 +29,8 @@ resource "aws_db_parameter_group" "this" {
   name   = "${var.project}-postgres-params"
   family = "postgres17"
 
+  tags = { Name = "${var.project}-postgres-params" }
+
   parameter {
     name  = "log_connections"
     value = 1

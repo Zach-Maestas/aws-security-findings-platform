@@ -60,6 +60,10 @@ resource "aws_iam_policy" "db_init_secrets_policy" {
   name        = "${var.project}-db-init-secrets-policy"
   description = "Policy to allow ECS task to read DB admin credentials from Secrets Manager"
   policy      = data.aws_iam_policy_document.db_init_exec_secrets.json
+
+  tags = {
+    Name = "${var.project}-db-init-secrets-policy"
+  }
 }
 
 # Policy Attachment for DB Init Secrets access
@@ -90,6 +94,11 @@ resource "aws_ecs_task_definition" "db_init" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_exec_db_init.arn
+
+  tags = {
+    Name = "${var.project}-db-init-task"
+  }
+
   container_definitions = jsonencode([
     {
       name  = "db-init-container"

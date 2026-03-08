@@ -48,7 +48,6 @@ module "secrets" {
 module "data" {
   source                = "./modules/data"
   project               = var.project
-  vpc_id                = module.network.vpc_id
   private_db_subnet_ids = module.network.private_db_subnet_ids
   rds_sg_id             = module.network.rds_sg_id
 }
@@ -61,7 +60,6 @@ module "app" {
   vpc_id                   = module.network.vpc_id
   public_subnet_ids        = module.network.public_subnet_ids
   private_app_subnet_ids   = module.network.private_app_subnet_ids
-  private_db_subnet_ids    = module.network.private_db_subnet_ids
   alb_sg_id                = module.network.alb_sg_id
   ecs_tasks_sg_id          = module.network.ecs_tasks_sg_id
   certificate_arn          = module.acm.certificate_arn

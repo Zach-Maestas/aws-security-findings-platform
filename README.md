@@ -17,18 +17,26 @@ Built to be deployed, torn down, and redeployed from a single command.
 | Data | RDS PostgreSQL | Managed relational database in private subnet |
 | Secrets | AWS Secrets Manager | Runtime credential injection, no plaintext secrets |
 | Registry | ECR | Private container image storage |
-| Observability | CloudWatch Logs | Centralized logging (Phase 2) |
+| Observability | CloudWatch Logs | ECS, RDS PostgreSQL, VPC Flow Logs, CloudTrail |
+| Detection | GuardDuty, Security Hub | Automated threat detection and findings aggregation |
+| Response | EventBridge, Lambda, SNS | Automated remediation and alerting |
+| CI/CD | GitHub Actions | OIDC auth, security scanning, automated deployment |
 
 ## Security Controls
 
 | Control | Implementation | Evidence |
 |---------|---------------|----------|
 | Network isolation | ECS tasks and RDS in private subnets, ALB in public | Security group rules in Terraform |
-| Least-privilege IAM | Scoped execution role per service | IAM policy snippets |
+| Least-privilege IAM | Scoped execution role per service, permissions boundaries | IAM policy snippets |
 | Secrets management | DB credentials via Secrets Manager, injected at runtime | Task definition config |
 | TLS/HTTPS | ALB listener with ACM certificate | ALB listener configuration |
 | No broad ingress | Security groups scoped to specific ports and sources | SG rule audit |
 | Non-root container | Application runs as non-root user | Dockerfile USER directive |
+| Audit logging | CloudTrail API logging, RDS query logging, VPC Flow Logs | CloudWatch log groups |
+| Threat detection | GuardDuty + Security Hub | Enabled dashboards |
+| Automated response | EventBridge → Lambda remediation for IAM escalation and SG misconfig | Incident reports with timelines |
+| Pipeline security | Gitleaks, Checkov, Trivy scans gate all PRs | Pass/fail screenshots |
+| OIDC authentication | GitHub Actions authenticates via OIDC, no stored credentials | Trust policy + permissions boundary |
 
 ## Quick Start
 
@@ -79,21 +87,22 @@ Key work:
 - Written incident narrative documenting detection, response, and lessons learned
 - Python scripting for detection and triage automation
 
-### Phase 3: DevSecOps — Pipeline Security Gates — 🔲 Planned
+### Phase 3: DevSecOps — Pipeline Security Gates — ✅ Complete
 Shift security left by embedding scanning and policy enforcement into the development workflow.
 
-Planned work:
+Key work:
 - GitHub Actions with OIDC-based AWS authentication (no stored credentials)
-- IaC scanning with tfsec or checkov (static analysis on Terraform)
-- Container image scanning for known vulnerabilities
-- Secret detection in code (pre-commit or CI-based)
+- IaC scanning with Checkov (static analysis on Terraform)
+- Container image scanning with Trivy for known CVEs
+- Secret detection with Gitleaks across full git history
 - Pipeline gates that block PR merges on security failures
-- Deliberate vulnerability introduction → scanner detection → documented remediation
-- Before/after evidence showing the security feedback loop in action
+- Vulnerability caught by scanner → documented fix → pipeline passes
+- Permissions boundary on deploy role preventing privilege escalation
+- RDS PostgreSQL logging and VPC Flow Logs for observability
 
 ## Evidence
 
-Evidence artifacts for completed phases are in [`docs/`](docs/) — see [Security Design](docs/security.md) and [Incident Narrative](docs/incident-narrative.md).
+Evidence artifacts for all phases are in [`docs/`](docs/) — see [Security Design](docs/security.md) and [Incident Reports](docs/incident-reports.md).
 
 ## Known Limitations
 
@@ -107,15 +116,19 @@ Evidence artifacts for completed phases are in [`docs/`](docs/) — see [Securit
 |------|---------|---------|
 | Terraform | >= 1.0 | Infrastructure as Code |
 | AWS ECS Fargate | - | Container orchestration |
-| Flask + Gunicorn | Python 3.x | API application |
-| PostgreSQL | 16 | Relational database (RDS) |
+| Flask + Gunicorn | Python 3.13 | API application |
+| PostgreSQL | 17 | Relational database (RDS) |
 | Docker | buildx | Container builds |
+| GitHub Actions | - | CI/CD with OIDC authentication |
+| Checkov | - | IaC security scanning |
+| Trivy | - | Container vulnerability scanning |
+| Gitleaks | - | Secret detection |
 
 ## Documentation
 
-- [Deployment Guide](docs/deployment.md) — deploy, verify, teardown, and troubleshooting
-- [Security Design](docs/security.md) — security controls, IAM design, and trade-off rationale
-- [Incident Narrative](docs/incident-narrative.md) — simulated security incidents with detection and response evidence
+- [Deployment Guide](docs/deployment.md) — deploy, verify, teardown, CI/CD, and troubleshooting
+- [Security Design](docs/security.md) — security controls, IAM design, pipeline gates, and trade-off rationale
+- [Incident Reports](docs/incident-reports.md) — simulated security incidents with detection and response evidence
 
 ## Repository Structure
 
@@ -133,6 +146,10 @@ Evidence artifacts for completed phases are in [`docs/`](docs/) — see [Securit
 │       ├── backend-state-init/   # Bootstrap for remote state (S3 + DynamoDB)
 │       ├── ci-oidc/              # GitHub Actions OIDC federation
 │       └── modules/              # network, app, data, secrets, acm, security-ops
+├── .github/
+│   └── workflows/
+│       ├── pr-checks.yml         # Security scans + terraform plan on PRs
+│       └── deploy.yml            # Build + deploy on merge/dispatch
 ├── Makefile                  # Deploy/destroy orchestration
 └── README.md
 ```

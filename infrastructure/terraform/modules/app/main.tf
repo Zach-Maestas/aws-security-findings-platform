@@ -51,6 +51,10 @@ resource "aws_lb_listener" "http" {
       status_code = "HTTP_301"
     }
   }
+
+  tags = {
+    Name = "${var.project}-http-listener"
+  }
 }
 
 # ALB HTTPS Listener
@@ -58,12 +62,16 @@ resource "aws_lb_listener" "https" {
   load_balancer_arn = aws_lb.this.arn
   port              = "443"
   protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
   certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.app.arn
+  }
+
+  tags = {
+    Name = "${var.project}-https-listener"
   }
 }
 
@@ -156,6 +164,10 @@ resource "aws_iam_policy" "app_secrets_policy" {
   name        = "${var.project}-app-secrets-policy"
   description = "Policy to allow ECS task to read DB credentials from Secrets Manager"
   policy      = data.aws_iam_policy_document.app_exec_secrets.json
+
+  tags = {
+    Name = "${var.project}-app-secrets-policy"
+  }
 }
 
 # Policy Attachment for ECS App Execution Role
@@ -178,6 +190,11 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = 256
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_exec_app.arn
+
+  tags = {
+    Name = "${var.project}-api-task"
+  }
+
   container_definitions = jsonencode([
     {
       name  = "api-container"

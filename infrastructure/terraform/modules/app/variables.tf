@@ -18,11 +18,6 @@ variable "private_app_subnet_ids" {
   type        = list(string)
 }
 
-variable "private_db_subnet_ids" {
-  description = "List of private subnet IDs (for RDS)"
-  type        = list(string)
-}
-
 variable "certificate_arn" {
   description = "The ARN of the ACM certificate to use with the ALB"
   type        = string

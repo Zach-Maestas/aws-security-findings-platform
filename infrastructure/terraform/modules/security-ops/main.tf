@@ -19,6 +19,10 @@ resource "aws_cloudtrail" "this" {
 
   cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cw_cloudtrail_logs_group.arn}:*"
   cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch_role.arn
+
+  tags = {
+    Name = "${var.project}-cloudtrail"
+  }
 }
 
 # S3 Bucket for CloudTrail log delivery
@@ -145,6 +149,10 @@ resource "aws_iam_policy" "cloudtrail_cloudwatch_logs_policy" {
   name        = "${var.project}-cloudtrail-cloudwatch-policy"
   description = "Policy to allow CloudTrail to deliver logs to CloudWatch"
   policy      = data.aws_iam_policy_document.cloudtrail_cloudwatch_logs.json
+
+  tags = {
+    Name = "${var.project}-cloudtrail-cloudwatch-policy"
+  }
 }
 
 # IAM Policy attachment for CloudTrail -> CloudWatch
@@ -243,6 +251,10 @@ resource "aws_iam_role" "lambda_exec_role" {
   })
 
   permissions_boundary = var.permissions_boundary_arn
+
+  tags = {
+    Name = "${var.project}-lambda-exec-role"
+  }
 }
 
 # IAM Policy to allow Lambda remediation actions (IAM, EC2, CloudWatch Logs)
@@ -296,6 +308,10 @@ resource "aws_iam_policy" "lambda_remediation_permissions" {
   name        = "${var.project}-lambda-remediation"
   description = "Policy to allow Lambda to perform remediation actions and push logs to CloudWatch"
   policy      = data.aws_iam_policy_document.lambda_remediation_permissions.json
+
+  tags = {
+    Name = "${var.project}-lambda-remediation"
+  }
 }
 
 # Policy Attachment for Lambda exec role
