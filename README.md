@@ -1,4 +1,4 @@
-# AWS Cloud Security Operations & DevSecOps Project
+# Automated Cloud Infrastructure & Security Platform
 
 A production-patterned AWS infrastructure project demonstrating cloud security engineering: secure networking, least-privilege IAM, secrets management, containerized deployment, monitoring/logging, detection and incident response, and DevSecOps pipeline security.
 
