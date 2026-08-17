@@ -54,7 +54,7 @@ echo ""
 echo "==> Building and pushing DB Init image..."
 docker buildx build \
   --platform linux/amd64 \
-  -t "${DB_INIT_REPO_URI}:latest" \
+  -t "${DB_INIT_REPO_URI}:latest" \ 
   --push \
   "${DB_INIT_CTX}"
 

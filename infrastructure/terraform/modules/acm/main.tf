@@ -38,7 +38,7 @@ resource "aws_route53_record" "validation" {
   name    = each.value.name
   type    = each.value.type
   records = [each.value.record]
-  ttl     = 60
+  ttl     = 604
 }
 
 # Validate the ACM certificate

@@ -17,8 +17,8 @@ jobs:
     name: Terraform Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Format
         run: terraform fmt -check -recursive
@@ -39,7 +39,7 @@ jobs:
     name: Secret Detection
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -54,7 +54,7 @@ jobs:
     name: IaC Security Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
@@ -81,7 +81,7 @@ jobs:
     name: Container Security Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build backend image
         run: docker build -t secops-app ./application/backend
@@ -117,14 +117,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [terraform-lint, gitleaks, checkov, trivy]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::124355647999:role/secops-pipeline-github-actions-plan
           aws-region: us-east-1
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Init
         run: terraform init
