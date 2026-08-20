@@ -71,7 +71,7 @@ variable "route53_zone_id" {
 variable "api_image_tag" {
   description = "Docker image tag for the API container"
   type        = string
-  default     = "latest"
+  default     = "latest" # replace with SHA hash from pipeline deploy
 }
 
 variable "db_init_image_tag" {

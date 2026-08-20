@@ -8,5 +8,5 @@ azs                      = ["us-east-1a", "us-east-1b"]
 region                   = "us-east-1"
 domain_name              = "api.zachmaestas-capstone.com" # <-- Used for ACM + Route 53 A record
 route53_zone_id          = "Z00547482WA2XUJ97RWO2"
-alert_email              = "alerts@example.com"
+alert_email              = "zachary.maestas03@gmail.com"
 permissions_boundary_arn = "arn:aws:iam::124355647999:policy/secops-pipeline-deploy-permissions-boundary"

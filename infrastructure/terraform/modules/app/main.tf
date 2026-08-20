@@ -102,7 +102,7 @@ resource "aws_lb_target_group" "app" {
 # ECR Repository (API)
 resource "aws_ecr_repository" "ecr_api_repo" {
   name         = "${var.project}-api-repo"
-  force_delete = true
+  force_delete = true # delete repo even if it still contains images (set to false in prod)
 
   image_scanning_configuration {
     scan_on_push = true
@@ -144,7 +144,7 @@ resource "aws_iam_role" "ecs_exec_app" {
   }
 }
 
-# IAM Policy Document for App Secrets access
+# IAM Policy Document for App Secrets access 
 data "aws_iam_policy_document" "app_exec_secrets" {
   statement {
     sid    = "ReadSecretsForInjection"
@@ -187,13 +187,9 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "${var.project}-api-task"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 256
+  cpu                      = 256 # 1024 CPU units = 1 vCPU (0.25 vCPU)
   memory                   = 512
   execution_role_arn       = aws_iam_role.ecs_exec_app.arn
-
-  tags = {
-    Name = "${var.project}-api-task"
-  }
 
   container_definitions = jsonencode([
     {
@@ -247,6 +243,10 @@ resource "aws_ecs_task_definition" "api" {
       }
     }
   ])
+
+  tags = {
+    Name = "${var.project}-api-task"
+  }
 }
 
 # ECS Service (API)
@@ -255,7 +255,7 @@ resource "aws_ecs_service" "api" {
   cluster                            = aws_ecs_cluster.this.id
   task_definition                    = aws_ecs_task_definition.api.arn
   desired_count                      = var.api_desired_count
-  deployment_minimum_healthy_percent = 0
+  deployment_minimum_healthy_percent = 0 # set to 0 for bootstrapping
   launch_type                        = "FARGATE"
 
   load_balancer {
@@ -265,7 +265,7 @@ resource "aws_ecs_service" "api" {
   }
 
   lifecycle {
-    ignore_changes = [desired_count]
+    ignore_changes = [desired_count] # lets auto-scaling own this value at runtime
   }
 
   network_configuration {

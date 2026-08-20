@@ -19,7 +19,7 @@ resource "aws_db_subnet_group" "this" {
 
 # CloudWatch Log Group for PostgreSQL logs
 resource "aws_cloudwatch_log_group" "rds_postgresql" {
-  name              = "/aws/rds/instance/${var.project}-rds/postgresql"
+  name              = "/aws/rds/instance/${lower(var.project)}-rds/postgresql"
   retention_in_days = 7
   tags              = { Name = "${var.project}-rds-logs" }
 }

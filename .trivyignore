@@ -1,9 +1,0 @@
-# gosu binary in official postgres Docker image is compiled with Go 1.24.6
-# These CVEs require gosu to be rebuilt with Go >= 1.24.13 by upstream maintainers
-# Accepted risk: db-init container runs in a private subnet with no internet-facing exposure
-CVE-2025-68121
-CVE-2025-58183
-CVE-2025-61726
-CVE-2025-61728
-CVE-2025-61729
-CVE-2025-61730

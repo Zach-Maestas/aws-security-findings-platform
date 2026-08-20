@@ -39,10 +39,10 @@ resource "aws_s3_bucket" "cloudtrail_logs" {
 resource "aws_s3_bucket_public_access_block" "cloudtrail_logs" {
   bucket = aws_s3_bucket.cloudtrail_logs.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = true # Prevents new ACLs that grant public access from being created
+  block_public_policy     = true # Prevents new bucket policies that grant public access from being PUT
+  ignore_public_acls      = true # Makes S3 ignore public ACLs
+  restrict_public_buckets = true # Restricts access to the bucket so that only AWS services and authorized users within this account can access it
 }
 
 # S3 bucket policy granting CloudTrail permission to deliver logs
@@ -266,7 +266,7 @@ data "aws_iam_policy_document" "lambda_remediation_permissions" {
       "iam:DetachRolePolicy"
     ]
     resources = [
-      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-*"
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*"
     ]
   }
   statement {

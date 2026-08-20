@@ -23,13 +23,13 @@ jobs:
     name: Build, Push, and Deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # =====================================================================
       # Authenticate to AWS via OIDC (no stored credentials)
       # =====================================================================
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.PROJECT }}-github-actions-deploy
           aws-region: ${{ env.AWS_REGION }}
@@ -38,7 +38,7 @@ jobs:
       # Terraform Apply (creates ECR repos + all infrastructure)
       # =====================================================================
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
 
       - name: Terraform Init
         run: terraform init
@@ -52,7 +52,7 @@ jobs:
       # Build, push, init DB, and scale up ECS (reuse existing scripts)
       # =====================================================================
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Set script permissions
         run: chmod +x infrastructure/scripts/deploy/*.sh
