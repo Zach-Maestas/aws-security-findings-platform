@@ -3,9 +3,9 @@
 Network Module: VPC, Subnets, and Connectivity
 ==============================================================================
 Provisions a multi-AZ VPC with:
-- Public subnets for ALB (internet-facing)
-- Private application subnets for ECS tasks
-- Private database subnets for RDS
+- Public subnets for future internet-facing resources
+- Private application subnets (currently empty, reserved for the compute tier)
+- Private database subnets (currently empty, reserved for the data tier)
 - Route tables, IGW, and NAT gateways for internet connectivity
 ==============================================================================
 */
@@ -148,67 +148,4 @@ resource "aws_route" "private_internet_access" {
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.this[count.index].id
-}
-
-# --- VPC FLOW LOGS ---
-
-# CloudWatch Log Group for VPC Flow Logs
-resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  name              = "/aws/vpc/flow-logs/${var.project}"
-  retention_in_days = 7
-  tags              = { Name = "${var.project}-vpc-flow-logs" }
-}
-
-# IAM Role for VPC Flow Logs — allows the flow log service to write to CloudWatch
-resource "aws_iam_role" "vpc_flow_logs" {
-  name = "${var.project}-vpc-flow-logs-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Allow"
-        Principal = { Service = "vpc-flow-logs.amazonaws.com" }
-        Action    = "sts:AssumeRole"
-      }
-    ]
-  })
-
-  permissions_boundary = var.permissions_boundary_arn
-  tags                 = { Name = "${var.project}-vpc-flow-logs-role" }
-}
-
-# Inline policy granting CloudWatch Logs write access for VPC Flow Logs
-resource "aws_iam_role_policy" "vpc_flow_logs" {
-  name = "${var.project}-vpc-flow-logs-policy"
-  role = aws_iam_role.vpc_flow_logs.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "WriteVPCFlowLogsToCloudWatch"
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
-      }
-    ]
-  })
-}
-
-# VPC Flow Log
-resource "aws_flow_log" "this" {
-  vpc_id               = aws_vpc.main.id
-  traffic_type         = "ALL"
-  log_destination_type = "cloud-watch-logs"
-  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
-  iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
-
-  tags = { Name = "${var.project}-vpc-flow-log" }
 }

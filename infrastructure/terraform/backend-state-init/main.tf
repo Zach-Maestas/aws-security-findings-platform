@@ -12,6 +12,13 @@ workspace that must be applied before the main infrastructure. Remote state
 isn't strictly required for a personal project, but demonstrates production
 practices: state locking prevents concurrent modifications, versioning enables
 rollback, and centralized storage supports team collaboration and CI/CD.
+
+The DynamoDB lock table keeps a generic, non-project-prefixed name
+("terraform-lock") since it's an implementation detail nobody reads — the S3
+bucket name is what's project-prefixed, since it has to match backend.tf and
+ci-oidc's state-access policy literally (Terraform's `backend "s3"` block
+can't reference variables, so that one value stays hardcoded there by
+necessity, not by choice).
 ==============================================================================
 */
 
@@ -21,10 +28,11 @@ provider "aws" {
 
 # S3 Bucket for Terraform State
 resource "aws_s3_bucket" "tfstate" {
-  bucket = "secops-pipeline-tfstate"
+  bucket        = "${var.project}-tfstate"
+  force_destroy = true # versioning keeps every state revision; without this, a replace/destroy fails with BucketNotEmpty since old versions block deletion
 
   tags = {
-    Name = "secops-pipeline-tfstate"
+    Name = "${var.project}-tfstate"
   }
 }
 
@@ -40,7 +48,7 @@ resource "aws_dynamodb_table" "tflock" {
   }
 
   tags = {
-    Name = "secops-pipeline-terraform-lock"
+    Name = "${var.project}-terraform-lock"
   }
 }
 
