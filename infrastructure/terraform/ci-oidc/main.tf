@@ -7,25 +7,7 @@ Provisions OIDC federation for GitHub Actions CI/CD:
 - Plan role: read-only, used on PR workflows for scans + terraform plan
 - Deploy role: provisioning access with permissions boundary, used on merge to main
 
-Note: This module's state is stored locally. It exists as a separate bootstrap
-workspace that must be applied before the main infrastructure. OIDC least privilege
-isn't strictly required for a personal project, but demonstrates production
-practices: prevents giving root access to GitHub Actions, prevents privilege escalation, 
-and prevents stored AWS credentials.
-
-Permissions trimmed 2026-09: the security-ops module (CloudTrail, GuardDuty,
-Security Hub, EventBridge/Lambda remediation, SNS alerting) and the app/data
-layers were removed during a backend-focused rescope. The deploy role's
-security-ops-only statements (CloudTrail, GuardDuty, SecurityHub, Lambda,
-EventBridge, SNS, and the S3 statement that existed only for the CloudTrail
-logs bucket) were removed rather than left dangling and unused. Route53, ACM,
-and KMS were left in place since the app layer (and its ALB/ACM cert) is
-expected to return soon and would need them again immediately.
-
-Renamed 2026-09 (secops-pipeline -> aws-security-findings-platform): project
-name, GitHub owner/repo, the state bucket/lock table, and the AWS account ID
-are now all variables/data lookups instead of hardcoded locals, so a future
-rename or fork only touches terraform.tfvars — no code edit required.
+State is stored locally. Must be applied before the main infrastructure.
 ==============================================================================
 */
 
@@ -36,9 +18,7 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  # GitHub embeds the immutable owner/repo IDs in the sub claim (OWNER@ID/REPO@ID),
-  # not just the mutable names — this makes the trust condition survive any future
-  # rename instead of breaking like the name-only version just did.
+  # sub claim includes immutable owner/repo IDs, not just names: repo:OWNER@ID/REPO@ID
   github_sub = "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
 
   # Constructed ARN to break circular dependency (boundary references itself)
@@ -421,11 +401,6 @@ resource "aws_iam_policy" "deploy_permissions" {
 
 # =============================================================================
 # Deploy Role: Security operations permissions (split to stay under 6144 limit)
-# =============================================================================
-# Trimmed 2026-09: security-ops (CloudTrail, GuardDuty, SecurityHub, Lambda,
-# EventBridge, SNS) and its S3 statement were removed — that infrastructure
-# no longer exists in this repo. Route53, ACM, and KMS stay: they back the
-# app module's ALB/ACM cert, which is expected to return soon.
 # =============================================================================
 
 data "aws_iam_policy_document" "deploy_security_permissions" {

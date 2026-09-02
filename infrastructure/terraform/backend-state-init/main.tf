@@ -7,18 +7,11 @@ Provisions bootstrap resources for Terraform remote state:
 - DynamoDB table for state locking
 - Public access blocks for security
 
-Note: This module's state is stored locally. It exists as a separate bootstrap
-workspace that must be applied before the main infrastructure. Remote state
-isn't strictly required for a personal project, but demonstrates production
-practices: state locking prevents concurrent modifications, versioning enables
-rollback, and centralized storage supports team collaboration and CI/CD.
+State is stored locally. Must be applied before the main infrastructure.
 
-The DynamoDB lock table keeps a generic, non-project-prefixed name
-("terraform-lock") since it's an implementation detail nobody reads — the S3
-bucket name is what's project-prefixed, since it has to match backend.tf and
-ci-oidc's state-access policy literally (Terraform's `backend "s3"` block
-can't reference variables, so that one value stays hardcoded there by
-necessity, not by choice).
+DynamoDB table name stays generic ("terraform-lock"); the S3 bucket name is
+project-prefixed since backend.tf's `backend "s3"` block can't reference
+variables and must match this literally.
 ==============================================================================
 */
 
@@ -29,7 +22,7 @@ provider "aws" {
 # S3 Bucket for Terraform State
 resource "aws_s3_bucket" "tfstate" {
   bucket        = "${var.project}-tfstate"
-  force_destroy = true # versioning keeps every state revision; without this, a replace/destroy fails with BucketNotEmpty since old versions block deletion
+  force_destroy = true # required for a clean replace/destroy since versioning keeps old object versions
 
   tags = {
     Name = "${var.project}-tfstate"
