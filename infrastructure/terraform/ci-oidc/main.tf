@@ -7,26 +7,22 @@ Provisions OIDC federation for GitHub Actions CI/CD:
 - Plan role: read-only, used on PR workflows for scans + terraform plan
 - Deploy role: provisioning access with permissions boundary, used on merge to main
 
-Note: This module's state is stored locally. It exists as a separate bootstrap
-workspace that must be applied before the main infrastructure. OIDC least privilege
-isn't strictly required for a personal project, but demonstrates production
-practices: prevents giving root access to GitHub Actions, prevents privilege escalation, 
-and prevents stored AWS credentials.
+State is stored locally. Must be applied before the main infrastructure.
 ==============================================================================
 */
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
-  region     = "us-east-1"
-  account_id = "124355647999"
-  project    = "secops-pipeline"
-  github_sub = "repo:Zach-Maestas/aws-security-ops-pipeline"
+  # sub claim includes immutable owner/repo IDs, not just names: repo:OWNER@ID/REPO@ID
+  github_sub = "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
 
   # Constructed ARN to break circular dependency (boundary references itself)
-  permissions_boundary_arn = "arn:aws:iam::${local.account_id}:policy/${local.project}-deploy-permissions-boundary"
+  permissions_boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-deploy-permissions-boundary"
 }
 
 # =============================================================================
@@ -46,7 +42,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   ]
 
   tags = {
-    Name = "${local.project}-oidc-provider"
+    Name = "${var.project}-oidc-provider"
   }
 }
 
@@ -62,7 +58,7 @@ data "aws_iam_policy_document" "terraform_state" {
       "s3:ListBucket"
     ]
     resources = [
-      "arn:aws:s3:::secops-pipeline-tfstate"
+      "arn:aws:s3:::${var.tfstate_bucket}"
     ]
   }
 
@@ -74,7 +70,7 @@ data "aws_iam_policy_document" "terraform_state" {
       "s3:PutObject"
     ]
     resources = [
-      "arn:aws:s3:::secops-pipeline-tfstate/*"
+      "arn:aws:s3:::${var.tfstate_bucket}/*"
     ]
   }
 
@@ -87,18 +83,18 @@ data "aws_iam_policy_document" "terraform_state" {
       "dynamodb:DeleteItem"
     ]
     resources = [
-      "arn:aws:dynamodb:${local.region}:${local.account_id}:table/terraform-lock"
+      "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.tfstate_lock_table}"
     ]
   }
 }
 
 resource "aws_iam_policy" "terraform_state" {
-  name        = "${local.project}-terraform-state-access"
+  name        = "${var.project}-terraform-state-access"
   description = "S3 and DynamoDB access for Terraform remote state"
   policy      = data.aws_iam_policy_document.terraform_state.json
 
   tags = {
-    Name = "${local.project}-terraform-state-access"
+    Name = "${var.project}-terraform-state-access"
   }
 }
 
@@ -107,7 +103,7 @@ resource "aws_iam_policy" "terraform_state" {
 # =============================================================================
 
 resource "aws_iam_role" "github_actions_plan" {
-  name = "${local.project}-github-actions-plan"
+  name = "${var.project}-github-actions-plan"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -131,7 +127,7 @@ resource "aws_iam_role" "github_actions_plan" {
   })
 
   tags = {
-    Name = "${local.project}-github-actions-plan"
+    Name = "${var.project}-github-actions-plan"
   }
 }
 
@@ -188,12 +184,12 @@ data "aws_iam_policy_document" "plan_permissions" {
 }
 
 resource "aws_iam_policy" "plan_permissions" {
-  name        = "${local.project}-github-actions-plan-permissions"
+  name        = "${var.project}-github-actions-plan-permissions"
   description = "Read-only permissions for terraform plan in PR workflows"
   policy      = data.aws_iam_policy_document.plan_permissions.json
 
   tags = {
-    Name = "${local.project}-github-actions-plan-permissions"
+    Name = "${var.project}-github-actions-plan-permissions"
   }
 }
 
@@ -212,7 +208,7 @@ resource "aws_iam_role_policy_attachment" "plan_permissions" {
 # =============================================================================
 
 resource "aws_iam_role" "github_actions_deploy" {
-  name = "${local.project}-github-actions-deploy"
+  name = "${var.project}-github-actions-deploy"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -235,10 +231,10 @@ resource "aws_iam_role" "github_actions_deploy" {
     ]
   })
 
-  permissions_boundary = local.permissions_boundary_arn
+  permissions_boundary = aws_iam_policy.deploy_permissions_boundary.arn
 
   tags = {
-    Name = "${local.project}-github-actions-deploy"
+    Name = "${var.project}-github-actions-deploy"
   }
 }
 
@@ -271,7 +267,7 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "ecr:TagResource", "ecr:PutLifecyclePolicy", "ecr:PutImageTagMutability"
     ]
     resources = [
-      "arn:aws:ecr:${local.region}:${local.account_id}:repository/${local.project}-*"
+      "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/${var.project}-*"
     ]
   }
 
@@ -281,10 +277,10 @@ data "aws_iam_policy_document" "deploy_permissions" {
     effect  = "Allow"
     actions = ["ecs:*"]
     resources = [
-      "arn:aws:ecs:${local.region}:${local.account_id}:cluster/${local.project}-*",
-      "arn:aws:ecs:${local.region}:${local.account_id}:service/${local.project}-*/*",
-      "arn:aws:ecs:${local.region}:${local.account_id}:task-definition/${local.project}-*:*",
-      "arn:aws:ecs:${local.region}:${local.account_id}:task/${local.project}-*/*"
+      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${var.project}-*",
+      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:service/${var.project}-*/*",
+      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project}-*:*",
+      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task/${var.project}-*/*"
     ]
   }
 
@@ -307,9 +303,9 @@ data "aws_iam_policy_document" "deploy_permissions" {
     effect  = "Allow"
     actions = ["rds:*"]
     resources = [
-      "arn:aws:rds:${local.region}:${local.account_id}:db:${local.project}-*",
-      "arn:aws:rds:${local.region}:${local.account_id}:subgrp:${local.project}-*",
-      "arn:aws:rds:${local.region}:${local.account_id}:pg:${local.project}-*"
+      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:db:${var.project}-*",
+      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:subgrp:${var.project}-*",
+      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:pg:${var.project}-*"
     ]
   }
 
@@ -347,8 +343,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "iam:ListInstanceProfilesForRole"
     ]
     resources = [
-      "arn:aws:iam::${local.account_id}:role/${local.project}-*",
-      "arn:aws:iam::${local.account_id}:policy/${local.project}-*"
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-*"
     ]
   }
 
@@ -363,9 +359,9 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "secretsmanager:GetResourcePolicy", "secretsmanager:PutResourcePolicy"
     ]
     resources = [
-      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}-*",
-      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.project}/*",
-      "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:rds!*"
+      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}-*",
+      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}/*",
+      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:rds!*"
     ]
   }
 
@@ -379,8 +375,8 @@ data "aws_iam_policy_document" "deploy_permissions" {
       "logs:ListTagsLogGroup", "logs:ListTagsForResource"
     ]
     resources = [
-      "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*",
-      "arn:aws:logs:${local.region}:${local.account_id}:log-group:*${local.project}*:*"
+      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*${var.project}*",
+      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*${var.project}*:*"
     ]
   }
 
@@ -394,12 +390,12 @@ data "aws_iam_policy_document" "deploy_permissions" {
 }
 
 resource "aws_iam_policy" "deploy_permissions" {
-  name        = "${local.project}-github-actions-deploy-permissions"
+  name        = "${var.project}-github-actions-deploy-permissions"
   description = "Infrastructure provisioning permissions for terraform apply"
   policy      = data.aws_iam_policy_document.deploy_permissions.json
 
   tags = {
-    Name = "${local.project}-github-actions-deploy-permissions"
+    Name = "${var.project}-github-actions-deploy-permissions"
   }
 }
 
@@ -408,84 +404,6 @@ resource "aws_iam_policy" "deploy_permissions" {
 # =============================================================================
 
 data "aws_iam_policy_document" "deploy_security_permissions" {
-  # CloudTrail
-  statement {
-    sid    = "CloudTrail"
-    effect = "Allow"
-    actions = [
-      "cloudtrail:*"
-    ]
-    resources = ["*"]
-  }
-
-  # GuardDuty
-  statement {
-    sid    = "GuardDuty"
-    effect = "Allow"
-    actions = [
-      "guardduty:CreateDetector", "guardduty:DeleteDetector",
-      "guardduty:UpdateDetector", "guardduty:Get*",
-      "guardduty:List*", "guardduty:UpdateDetectorFeatures",
-      "guardduty:TagResource"
-    ]
-    resources = ["*"]
-  }
-
-  # Security Hub
-  statement {
-    sid    = "SecurityHub"
-    effect = "Allow"
-    actions = [
-      "securityhub:EnableSecurityHub", "securityhub:DisableSecurityHub",
-      "securityhub:Describe*", "securityhub:Get*",
-      "securityhub:UpdateSecurityHubConfiguration",
-      "securityhub:BatchEnableStandards", "securityhub:BatchDisableStandards"
-    ]
-    resources = ["*"]
-  }
-
-  # Lambda
-  statement {
-    sid    = "Lambda"
-    effect = "Allow"
-    actions = [
-      "lambda:*"
-    ]
-    resources = [
-      "arn:aws:lambda:${local.region}:${local.account_id}:function:${local.project}-*"
-    ]
-  }
-
-  # EventBridge
-  statement {
-    sid    = "EventBridge"
-    effect = "Allow"
-    actions = [
-      "events:PutRule", "events:DeleteRule",
-      "events:PutTargets", "events:RemoveTargets",
-      "events:Describe*", "events:List*",
-      "events:TagResource"
-    ]
-    resources = [
-      "arn:aws:events:${local.region}:${local.account_id}:rule/${local.project}-*"
-    ]
-  }
-
-  # SNS
-  statement {
-    sid    = "SNS"
-    effect = "Allow"
-    actions = [
-      "sns:CreateTopic", "sns:DeleteTopic",
-      "sns:Subscribe", "sns:Unsubscribe",
-      "sns:Get*", "sns:List*", "sns:SetTopicAttributes",
-      "sns:TagResource"
-    ]
-    resources = [
-      "arn:aws:sns:${local.region}:${local.account_id}:${local.project}-*"
-    ]
-  }
-
   # Route 53
   statement {
     sid    = "Route53"
@@ -510,17 +428,6 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
     resources = ["*"]
   }
 
-  # S3 for CloudTrail logs bucket
-  statement {
-    sid     = "S3CloudTrail"
-    effect  = "Allow"
-    actions = ["s3:*"]
-    resources = [
-      "arn:aws:s3:::${local.project}-*",
-      "arn:aws:s3:::${local.project}-*/*"
-    ]
-  }
-
   # KMS
   statement {
     sid       = "KMS"
@@ -531,12 +438,12 @@ data "aws_iam_policy_document" "deploy_security_permissions" {
 }
 
 resource "aws_iam_policy" "deploy_security_permissions" {
-  name        = "${local.project}-github-actions-deploy-security"
+  name        = "${var.project}-github-actions-deploy-security"
   description = "Security operations permissions for terraform apply"
   policy      = data.aws_iam_policy_document.deploy_security_permissions.json
 
   tags = {
-    Name = "${local.project}-github-actions-deploy-security"
+    Name = "${var.project}-github-actions-deploy-security"
   }
 }
 
@@ -585,9 +492,7 @@ data "aws_iam_policy_document" "deploy_permissions_boundary" {
       "securityhub:*",
       "route53:*",
       "acm:*",
-      "kms:*",
-      "dynamodb:*",
-      "sts:*"
+      "kms:*"
     ]
     resources = ["*"]
   }
@@ -629,11 +534,11 @@ data "aws_iam_policy_document" "deploy_permissions_boundary" {
 }
 
 resource "aws_iam_policy" "deploy_permissions_boundary" {
-  name        = "${local.project}-deploy-permissions-boundary"
+  name        = "${var.project}-deploy-permissions-boundary"
   description = "Permissions boundary preventing privilege escalation from deploy role"
   policy      = data.aws_iam_policy_document.deploy_permissions_boundary.json
 
   tags = {
-    Name = "${local.project}-deploy-permissions-boundary"
+    Name = "${var.project}-deploy-permissions-boundary"
   }
 }

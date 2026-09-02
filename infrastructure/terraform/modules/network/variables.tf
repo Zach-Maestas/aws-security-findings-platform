@@ -27,9 +27,3 @@ variable "azs" {
   description = "List of availability zones"
   type        = list(string)
 }
-
-variable "permissions_boundary_arn" {
-  description = "ARN of the permissions boundary to attach to IAM roles"
-  type        = string
-  default     = null
-}

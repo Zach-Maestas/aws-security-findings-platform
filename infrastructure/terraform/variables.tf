@@ -1,7 +1,7 @@
 variable "project" {
   description = "Project name used for resource naming and tagging"
   type        = string
-  default     = "secops-pipeline"
+  default     = "aws-security-findings-platform"
 }
 
 variable "vpc_cidr" {
@@ -25,34 +25,12 @@ variable "azs" {
   type        = list(string)
 }
 
-variable "domain_name" {
-  description = "The domain name for the ACM certificate (e.g. api.example.com)"
-  type        = string
-}
-
-variable "route53_zone_id" {
-  description = "The Route 53 Hosted Zone ID to use for ACM DNS validation"
-  type        = string
-}
-
 variable "private_app_subnet_cidrs" {
-  description = "Private subnets for application tier (ASG)"
+  description = "Private subnets reserved for the future application/compute tier"
   type        = list(string)
 }
 
 variable "private_db_subnet_cidrs" {
-  description = "Private subnets for RDS and failover"
+  description = "Private subnets reserved for the future data tier"
   type        = list(string)
-}
-
-variable "alert_email" {
-  description = "Email for SNS alerts"
-  type        = string
-  sensitive   = true
-}
-
-variable "permissions_boundary_arn" {
-  description = "ARN of the permissions boundary to attach to all IAM roles"
-  type        = string
-  default     = null
 }

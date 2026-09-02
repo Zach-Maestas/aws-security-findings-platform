@@ -1,14 +1,20 @@
 TERRAFORM_DIR := infrastructure/terraform
-SCRIPTS_DIR   := infrastructure/scripts/deploy
+
+# ==============================================================================
+# Primary deploy path is the GitHub Actions "Deploy Infrastructure" workflow
+# (workflow_dispatch), authenticated via OIDC — no stored AWS credentials.
+#
+# `deploy`/`destroy` below are a manual break-glass fallback for when Actions
+# is unavailable. They require your own local AWS credentials with apply-level
+# permissions on this account — that's a deliberate exception to the
+# no-stored-credentials posture the OIDC setup exists to enforce, so use them
+# only when you actually need to bypass the pipeline.
+# ==============================================================================
 
 deploy:
 	cd $(TERRAFORM_DIR) && terraform init && terraform apply -auto-approve && terraform fmt -recursive
-	bash $(SCRIPTS_DIR)/01_build_and_push_images.sh
-	bash $(SCRIPTS_DIR)/02_run_db_init.sh
-	bash $(SCRIPTS_DIR)/03_scale_ecs_service.sh 1
 
 destroy:
-	bash $(SCRIPTS_DIR)/03_scale_ecs_service.sh 0
 	cd $(TERRAFORM_DIR) && terraform destroy -auto-approve
 
 fmt:

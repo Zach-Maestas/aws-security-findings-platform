@@ -1,0 +1,8 @@
+project            = "aws-security-findings-platform"
+region             = "us-east-1"
+github_owner       = "Zach-Maestas"
+github_repo        = "aws-security-findings-platform"
+tfstate_bucket     = "aws-security-findings-platform-tfstate"
+tfstate_lock_table = "terraform-lock"
+github_owner_id    = "135179050"
+github_repo_id     = "1149350582"

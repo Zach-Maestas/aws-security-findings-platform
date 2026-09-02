@@ -40,6 +40,8 @@ Thumbs.db
 *.tfstate.*
 tfplan
 
-# Claude
+# Claude / Project Context
 CLAUDE.md
 .claude
+ZachMaestasResumeB.pdf
+Backened_Infra Project Phases.pdf

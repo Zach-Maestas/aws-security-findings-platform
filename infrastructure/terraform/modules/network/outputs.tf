@@ -17,22 +17,3 @@ output "private_db_subnet_ids" {
   description = "IDs of private database subnets (for RDS)"
   value       = aws_subnet.private_db[*].id
 }
-
-# ALB Security Group
-output "alb_sg_id" {
-  description = "Security group ID for ALB"
-  value       = aws_security_group.alb.id
-}
-
-# ECS Tasks Security Group
-output "ecs_tasks_sg_id" {
-  description = "Security group ID for ECS tasks"
-  value       = aws_security_group.ecs_tasks.id
-}
-
-# RDS Security Group
-output "rds_sg_id" {
-  description = "Security group ID for RDS"
-  value       = aws_security_group.rds.id
-}
-
