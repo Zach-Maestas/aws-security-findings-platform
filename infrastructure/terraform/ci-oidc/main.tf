@@ -36,7 +36,10 @@ provider "aws" {
 data "aws_caller_identity" "current" {}
 
 locals {
-  github_sub = "repo:${var.github_owner}/${var.github_repo}"
+  # GitHub embeds the immutable owner/repo IDs in the sub claim (OWNER@ID/REPO@ID),
+  # not just the mutable names — this makes the trust condition survive any future
+  # rename instead of breaking like the name-only version just did.
+  github_sub = "repo:${var.github_owner}@${var.github_owner_id}/${var.github_repo}@${var.github_repo_id}"
 
   # Constructed ARN to break circular dependency (boundary references itself)
   permissions_boundary_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-deploy-permissions-boundary"

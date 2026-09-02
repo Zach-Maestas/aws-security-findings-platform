@@ -33,3 +33,15 @@ variable "tfstate_lock_table" {
   type        = string
   default     = "terraform-lock"
 }
+
+variable "github_owner_id" {
+  description = "GitHub's immutable numeric owner ID — GitHub embeds this in the OIDC sub claim alongside the owner name, so the trust condition needs it too"
+  type        = string
+  default     = "135179050"
+}
+
+variable "github_repo_id" {
+  description = "GitHub's immutable numeric repository ID — GitHub embeds this in the OIDC sub claim alongside the repo name, so the trust condition needs it too"
+  type        = string
+  default     = "1149350582"
+}
