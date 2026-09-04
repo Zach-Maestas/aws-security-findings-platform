@@ -1,4 +1,4 @@
-# AWS Security Findings Platform
+# 🛡️ AWS Security Findings Platform
 
 A production-oriented cloud security findings and remediation platform: detects risky AWS activity, records and manages findings through a backend API, and performs reliable automated remediation. Combines backend software engineering (Python/FastAPI, PostgreSQL, Redis, Go workers) with infrastructure/platform engineering (AWS, Terraform, CI/CD, eventually Kubernetes/EKS).
 
