@@ -36,65 +36,71 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
     "sts.amazonaws.com"
   ]
 
-  thumbprint_list = [
-    "1b511abead59c6ce207077c0bf0e0043b1382612",
-    "6938fd4d98bab03faadb97b34396831e3780aea1"
-  ]
-
   tags = {
     Name = "${var.project}-oidc-provider"
   }
 }
 
 # =============================================================================
-# Shared Policy: Terraform State Access (both roles need this)
+# Terraform State Access
 # =============================================================================
 
-data "aws_iam_policy_document" "terraform_state" {
+data "aws_iam_policy_document" "terraform_state_read" {
   statement {
-    sid    = "S3BucketList"
-    effect = "Allow"
-    actions = [
-      "s3:ListBucket"
-    ]
-    resources = [
-      "arn:aws:s3:::${var.tfstate_bucket}"
-    ]
+    sid       = "S3BucketList"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::${var.tfstate_bucket}"]
   }
 
+  # Read state — both roles
   statement {
-    sid    = "S3ObjectAccess"
+    sid       = "StateRead"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["arn:aws:s3:::${var.tfstate_bucket}/${var.tfstate_key}"]
+  }
+
+  # Acquire and release the lock — both roles
+  statement {
+    sid    = "StateLock"
     effect = "Allow"
     actions = [
       "s3:GetObject",
-      "s3:PutObject"
+      "s3:PutObject",
+      "s3:DeleteObject",
     ]
-    resources = [
-      "arn:aws:s3:::${var.tfstate_bucket}/*"
-    ]
-  }
-
-  statement {
-    sid    = "DynamoDBStateLock"
-    effect = "Allow"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:DeleteItem"
-    ]
-    resources = [
-      "arn:aws:dynamodb:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.tfstate_lock_table}"
-    ]
+    resources = ["arn:aws:s3:::${var.tfstate_bucket}/${var.tfstate_key}.tflock"]
   }
 }
 
-resource "aws_iam_policy" "terraform_state" {
-  name        = "${var.project}-terraform-state-access"
-  description = "S3 and DynamoDB access for Terraform remote state"
-  policy      = data.aws_iam_policy_document.terraform_state.json
+# Deploy role only — the one thing plan must never do
+data "aws_iam_policy_document" "terraform_state_write" {
+  statement {
+    sid       = "StateWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["arn:aws:s3:::${var.tfstate_bucket}/${var.tfstate_key}"]
+  }
+}
+
+resource "aws_iam_policy" "terraform_state_read" {
+  name        = "${var.project}-terraform-state-read"
+  description = "Read Terraform remote state and acquire/release the S3 state lock"
+  policy      = data.aws_iam_policy_document.terraform_state_read.json
 
   tags = {
-    Name = "${var.project}-terraform-state-access"
+    Name = "${var.project}-terraform-state-read"
+  }
+}
+
+resource "aws_iam_policy" "terraform_state_write" {
+  name        = "${var.project}-terraform-state-write"
+  description = "Write Terraform remote state"
+  policy      = data.aws_iam_policy_document.terraform_state_write.json
+
+  tags = {
+    Name = "${var.project}-terraform-state-write"
   }
 }
 
@@ -139,45 +145,6 @@ data "aws_iam_policy_document" "plan_permissions" {
     effect = "Allow"
     actions = [
       "ec2:Describe*",
-      "ecs:Describe*",
-      "ecs:List*",
-      "ecr:Describe*",
-      "ecr:List*",
-      "ecr:GetAuthorizationToken",
-      "rds:Describe*",
-      "rds:ListTagsForResource",
-      "s3:Get*",
-      "s3:ListBucket",
-      "iam:Get*",
-      "iam:List*",
-      "secretsmanager:Describe*",
-      "secretsmanager:GetResourcePolicy",
-      "elasticloadbalancing:Describe*",
-      "logs:Describe*",
-      "logs:GetLogEvents",
-      "logs:ListTagsForResource",
-      "logs:ListTagsLogGroup",
-      "cloudtrail:Describe*",
-      "cloudtrail:GetTrailStatus",
-      "cloudtrail:ListTags",
-      "cloudtrail:GetEventSelectors",
-      "cloudtrail:GetInsightSelectors",
-      "guardduty:Get*",
-      "guardduty:List*",
-      "securityhub:Describe*",
-      "securityhub:Get*",
-      "lambda:Get*",
-      "lambda:List*",
-      "events:Describe*",
-      "events:List*",
-      "sns:Get*",
-      "sns:List*",
-      "route53:GetHostedZone",
-      "route53:ListResourceRecordSets",
-      "acm:Describe*",
-      "acm:List*",
-      "kms:Describe*",
-      "kms:List*"
     ]
     resources = ["*"]
   }
@@ -195,7 +162,7 @@ resource "aws_iam_policy" "plan_permissions" {
 
 resource "aws_iam_role_policy_attachment" "plan_state" {
   role       = aws_iam_role.github_actions_plan.name
-  policy_arn = aws_iam_policy.terraform_state.arn
+  policy_arn = aws_iam_policy.terraform_state_read.arn
 }
 
 resource "aws_iam_role_policy_attachment" "plan_permissions" {
@@ -204,7 +171,7 @@ resource "aws_iam_role_policy_attachment" "plan_permissions" {
 }
 
 # =============================================================================
-# Deploy Role: merge-to-main workflows (terraform apply + ECR push)
+# Deploy Role: merge-to-main workflows or manual GitHub Actions trigger
 # =============================================================================
 
 resource "aws_iam_role" "github_actions_deploy" {
@@ -238,155 +205,62 @@ resource "aws_iam_role" "github_actions_deploy" {
   }
 }
 
-# Deploy role: provisioning permissions for terraform apply
 data "aws_iam_policy_document" "deploy_permissions" {
-  # ECR + ECS global (actions that don't support resource-level ARNs)
+  # Refresh/plan path. EC2 Describe* does not support resource-level
+  # permissions in IAM, so "*" is required by AWS here, not by convenience.
   statement {
-    sid    = "ECRECSGlobal"
-    effect = "Allow"
-    actions = [
-      "ecr:GetAuthorizationToken",
-      "ecs:CreateCluster",
-      "ecs:RegisterTaskDefinition",
-      "ecs:DeregisterTaskDefinition",
-      "ecs:DescribeTaskDefinition",
-      "ecs:ListTaskDefinitions"
-    ]
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "ECR"
-    effect = "Allow"
-    actions = [
-      "ecr:PutImage", "ecr:BatchCheckLayerAvailability",
-      "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload",
-      "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
-      "ecr:Describe*", "ecr:List*",
-      "ecr:CreateRepository", "ecr:DeleteRepository",
-      "ecr:TagResource", "ecr:PutLifecyclePolicy", "ecr:PutImageTagMutability"
-    ]
-    resources = [
-      "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/${var.project}-*"
-    ]
-  }
-
-  # ECS: manage clusters, services, task definitions
-  statement {
-    sid     = "ECS"
-    effect  = "Allow"
-    actions = ["ecs:*"]
-    resources = [
-      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${var.project}-*",
-      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:service/${var.project}-*/*",
-      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task-definition/${var.project}-*:*",
-      "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task/${var.project}-*/*"
-    ]
-  }
-
-  # VPC + Networking
-  statement {
-    sid    = "Networking"
-    effect = "Allow"
-    actions = [
-      "ec2:*Vpc*", "ec2:*Subnet*", "ec2:*RouteTable*", "ec2:*Route",
-      "ec2:*InternetGateway*", "ec2:*NatGateway*", "ec2:*SecurityGroup*",
-      "ec2:*Address*", "ec2:*NetworkAcl*", "ec2:*Tags*", "ec2:*FlowLog*",
-      "ec2:Describe*", "ec2:AllocateAddress", "ec2:ReleaseAddress"
-    ]
-    resources = ["*"]
-  }
-
-  # RDS
-  statement {
-    sid     = "RDS"
-    effect  = "Allow"
-    actions = ["rds:*"]
-    resources = [
-      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:db:${var.project}-*",
-      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:subgrp:${var.project}-*",
-      "arn:aws:rds:${var.region}:${data.aws_caller_identity.current.account_id}:pg:${var.project}-*"
-    ]
-  }
-
-  statement {
-    sid       = "RDSDescribe"
+    sid       = "EC2Read"
     effect    = "Allow"
-    actions   = ["rds:Describe*"]
+    actions   = ["ec2:Describe*"]
     resources = ["*"]
   }
 
-  # ALB
   statement {
-    sid    = "ALB"
+    sid    = "NetworkWrite"
     effect = "Allow"
     actions = [
-      "elasticloadbalancing:*"
+      # aws_vpc (incl. enable_dns_hostnames / enable_dns_support)
+      "ec2:CreateVpc",
+      "ec2:DeleteVpc",
+      "ec2:ModifyVpcAttribute",
+
+      # aws_subnet (incl. map_public_ip_on_launch)
+      "ec2:CreateSubnet",
+      "ec2:DeleteSubnet",
+      "ec2:ModifySubnetAttribute",
+
+      # aws_route_table + aws_route_table_association
+      "ec2:CreateRouteTable",
+      "ec2:DeleteRouteTable",
+      "ec2:AssociateRouteTable",
+      "ec2:DisassociateRouteTable",
+      "ec2:ReplaceRouteTableAssociation",
+
+      # aws_route
+      "ec2:CreateRoute",
+      "ec2:DeleteRoute",
+      "ec2:ReplaceRoute",
+
+      # aws_internet_gateway
+      "ec2:CreateInternetGateway",
+      "ec2:DeleteInternetGateway",
+      "ec2:AttachInternetGateway",
+      "ec2:DetachInternetGateway",
+
+      # aws_eip
+      "ec2:AllocateAddress",
+      "ec2:ReleaseAddress",
+
+      # aws_nat_gateway
+      "ec2:CreateNatGateway",
+      "ec2:DeleteNatGateway",
+
+      # Tagging on create and on update
+      "ec2:CreateTags",
+      "ec2:DeleteTags",
     ]
     resources = ["*"]
   }
-
-  # IAM: create roles and policies for ECS tasks, Lambda
-  statement {
-    sid    = "IAMRoles"
-    effect = "Allow"
-    actions = [
-      "iam:CreateRole", "iam:DeleteRole", "iam:UpdateRole",
-      "iam:GetRole", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
-      "iam:AttachRolePolicy", "iam:DetachRolePolicy",
-      "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
-      "iam:TagRole", "iam:UntagRole",
-      "iam:PassRole",
-      "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy",
-      "iam:GetPolicyVersion", "iam:ListPolicyVersions", "iam:CreatePolicyVersion",
-      "iam:DeletePolicyVersion", "iam:TagPolicy",
-      "iam:ListInstanceProfilesForRole"
-    ]
-    resources = [
-      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-*",
-      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/${var.project}-*"
-    ]
-  }
-
-  # Secrets Manager
-  statement {
-    sid    = "SecretsManager"
-    effect = "Allow"
-    actions = [
-      "secretsmanager:CreateSecret", "secretsmanager:DeleteSecret",
-      "secretsmanager:Describe*", "secretsmanager:GetSecretValue",
-      "secretsmanager:PutSecretValue", "secretsmanager:TagResource",
-      "secretsmanager:GetResourcePolicy", "secretsmanager:PutResourcePolicy"
-    ]
-    resources = [
-      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}-*",
-      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:${var.project}/*",
-      "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:rds!*"
-    ]
-  }
-
-  # CloudWatch Logs
-  statement {
-    sid    = "CloudWatchLogs"
-    effect = "Allow"
-    actions = [
-      "logs:CreateLogGroup", "logs:DeleteLogGroup",
-      "logs:PutRetentionPolicy", "logs:TagResource",
-      "logs:ListTagsLogGroup", "logs:ListTagsForResource"
-    ]
-    resources = [
-      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*${var.project}*",
-      "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:*${var.project}*:*"
-    ]
-  }
-
-  statement {
-    sid       = "CloudWatchLogsDescribe"
-    effect    = "Allow"
-    actions   = ["logs:Describe*"]
-    resources = ["*"]
-  }
-
 }
 
 resource "aws_iam_policy" "deploy_permissions" {
@@ -399,67 +273,19 @@ resource "aws_iam_policy" "deploy_permissions" {
   }
 }
 
-# =============================================================================
-# Deploy Role: Security operations permissions (split to stay under 6144 limit)
-# =============================================================================
-
-data "aws_iam_policy_document" "deploy_security_permissions" {
-  # Route 53
-  statement {
-    sid    = "Route53"
-    effect = "Allow"
-    actions = [
-      "route53:ChangeResourceRecordSets", "route53:GetHostedZone",
-      "route53:ListResourceRecordSets", "route53:GetChange",
-      "route53:ListHostedZones"
-    ]
-    resources = ["*"]
-  }
-
-  # ACM
-  statement {
-    sid    = "ACM"
-    effect = "Allow"
-    actions = [
-      "acm:RequestCertificate", "acm:DeleteCertificate",
-      "acm:DescribeCertificate", "acm:ListCertificates",
-      "acm:AddTagsToCertificate", "acm:ListTagsForCertificate"
-    ]
-    resources = ["*"]
-  }
-
-  # KMS
-  statement {
-    sid       = "KMS"
-    effect    = "Allow"
-    actions   = ["kms:Describe*", "kms:List*", "kms:GetKeyPolicy"]
-    resources = ["*"]
-  }
-}
-
-resource "aws_iam_policy" "deploy_security_permissions" {
-  name        = "${var.project}-github-actions-deploy-security"
-  description = "Security operations permissions for terraform apply"
-  policy      = data.aws_iam_policy_document.deploy_security_permissions.json
-
-  tags = {
-    Name = "${var.project}-github-actions-deploy-security"
-  }
-}
-
 resource "aws_iam_role_policy_attachment" "deploy_state" {
   role       = aws_iam_role.github_actions_deploy.name
-  policy_arn = aws_iam_policy.terraform_state.arn
+  policy_arn = aws_iam_policy.terraform_state_read.arn
+}
+
+resource "aws_iam_role_policy_attachment" "deploy_state_write" {
+  role       = aws_iam_role.github_actions_deploy.name
+  policy_arn = aws_iam_policy.terraform_state_write.arn
 }
 
 resource "aws_iam_role_policy_attachment" "deploy_permissions" {
   role       = aws_iam_role.github_actions_deploy.name
   policy_arn = aws_iam_policy.deploy_permissions.arn
-}
-
-resource "aws_iam_role_policy_attachment" "deploy_security_permissions" {
-  role       = aws_iam_role.github_actions_deploy.name
-  policy_arn = aws_iam_policy.deploy_security_permissions.arn
 }
 
 # =============================================================================

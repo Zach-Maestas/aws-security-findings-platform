@@ -23,15 +23,15 @@ variable "github_repo" {
 }
 
 variable "tfstate_bucket" {
-  description = "Name of the S3 bucket holding Terraform remote state — must match backend-state-init's bucket"
+  description = "Name of the S3 bucket holding Terraform remote state"
   type        = string
   default     = "aws-security-findings-platform-tfstate"
 }
 
-variable "tfstate_lock_table" {
-  description = "Name of the DynamoDB table used for Terraform state locking — must match backend-state-init's table"
+variable "tfstate_key" {
+  description = "S3 object key of the Terraform state file"
   type        = string
-  default     = "terraform-lock"
+  default     = "platform/terraform.tfstate"
 }
 
 variable "github_owner_id" {
