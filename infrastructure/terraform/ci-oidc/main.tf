@@ -45,7 +45,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 # Terraform State Access
 # =============================================================================
 
-data "aws_iam_policy_document" "terraform_state" {
+data "aws_iam_policy_document" "terraform_state_read" {
   statement {
     sid       = "S3BucketList"
     effect    = "Allow"
@@ -84,19 +84,19 @@ data "aws_iam_policy_document" "terraform_state_write" {
   }
 }
 
-resource "aws_iam_policy" "terraform_state" {
-  name        = "${var.project}-terraform-state-access"
-  description = "S3 access for Terraform remote state locking"
-  policy      = data.aws_iam_policy_document.terraform_state.json
+resource "aws_iam_policy" "terraform_state_read" {
+  name        = "${var.project}-terraform-state-read"
+  description = "Read Terraform remote state and acquire/release the S3 state lock"
+  policy      = data.aws_iam_policy_document.terraform_state_read.json
 
   tags = {
-    Name = "${var.project}-terraform-state-access"
+    Name = "${var.project}-terraform-state-read"
   }
 }
 
 resource "aws_iam_policy" "terraform_state_write" {
   name        = "${var.project}-terraform-state-write"
-  description = "S3 write access for Terraform remote state locking"
+  description = "Write Terraform remote state"
   policy      = data.aws_iam_policy_document.terraform_state_write.json
 
   tags = {
@@ -162,7 +162,7 @@ resource "aws_iam_policy" "plan_permissions" {
 
 resource "aws_iam_role_policy_attachment" "plan_state" {
   role       = aws_iam_role.github_actions_plan.name
-  policy_arn = aws_iam_policy.terraform_state.arn
+  policy_arn = aws_iam_policy.terraform_state_read.arn
 }
 
 resource "aws_iam_role_policy_attachment" "plan_permissions" {
@@ -275,7 +275,7 @@ resource "aws_iam_policy" "deploy_permissions" {
 
 resource "aws_iam_role_policy_attachment" "deploy_state" {
   role       = aws_iam_role.github_actions_deploy.name
-  policy_arn = aws_iam_policy.terraform_state.arn
+  policy_arn = aws_iam_policy.terraform_state_read.arn
 }
 
 resource "aws_iam_role_policy_attachment" "deploy_state_write" {

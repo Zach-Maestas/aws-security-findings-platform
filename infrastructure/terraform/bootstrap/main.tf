@@ -38,6 +38,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "tfstate_sse" {
   bucket = aws_s3_bucket.tfstate.id
 
   rule {
+    # Block SSE-C: a caller supplying their own key could write state we can't read back.
     blocked_encryption_types = ["SSE-C"]
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
