@@ -5,9 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  id-token: write
   contents: read
-  pull-requests: write
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
@@ -97,6 +95,9 @@ jobs:
     name: Terraform Plan
     runs-on: ubuntu-latest
     needs: [terraform-lint, gitleaks, checkov]
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
 
