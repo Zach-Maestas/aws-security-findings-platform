@@ -1,0 +1,19 @@
+[project]
+name = "findings_platform"
+version = "0.1.0"
+description = "TODO: Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Zach-Maestas", email = "zachary.maestas03@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "sqlalchemy>=2.0.53",
+]
+
+[project.scripts]
+application = "src:findings_platform:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
