@@ -148,6 +148,14 @@ they match — a mismatch surfaces as an access denial on the next apply.
 
 ---
 
+## Application
+
+Deploying the API to AWS (ECS Fargate, RDS, container images, migrations on deploy)
+is added in Phase 2. For running the application locally, see
+[application/README.md](../application/README.md).
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
