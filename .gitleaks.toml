@@ -6,6 +6,4 @@ useDefault = true
 
 [allowlist]
 description = "Redacted placeholder values used in CloudTrail test fixtures (not real credentials)"
-regexes = [
-  '''ASIAEXAMPLEACCESSKEY''',
-]
+regexes = ['''ASIAEXAMPLEACCESSKEY''']
