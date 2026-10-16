@@ -1,0 +1,41 @@
+{
+    "eventVersion": "1.11",
+    "userIdentity": {
+        "type": "IAMUser",
+        "principalId": "AIDAEXAMPLEPRINCIPAL1",
+        "arn": "arn:aws:iam::111122223333:user/example-user",
+        "accountId": "111122223333",
+        "accessKeyId": "ASIAEXAMPLEACCESSKEY",
+        "userName": "example-user",
+        "sessionContext": {
+            "attributes": {
+                "creationDate": "2026-10-15T17:51:00Z",
+                "mfaAuthenticated": "false"
+            }
+        }
+    },
+    "eventTime": "2026-10-15T18:22:57Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "AttachGroupPolicy",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "203.0.113.10",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+    "requestParameters": {
+        "groupName": "test-admin-group",
+        "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+    },
+    "responseElements": null,
+    "requestID": "d7f92b5c-84dc-4030-a596-0ba7c1034c89",
+    "eventID": "0673aa1d-6879-4c8e-b8d9-ee785956374a",
+    "readOnly": false,
+    "eventType": "AwsApiCall",
+    "managementEvent": true,
+    "recipientAccountId": "111122223333",
+    "eventCategory": "Management",
+    "tlsDetails": {
+        "tlsVersion": "TLSv1.3",
+        "cipherSuite": "TLS_AES_128_GCM_SHA256",
+        "clientProvidedHostHeader": "iam.amazonaws.com"
+    },
+    "sessionCredentialFromConsole": "true"
+}
