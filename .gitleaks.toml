@@ -1,0 +1,11 @@
+# Gitleaks configuration: default rules plus a narrow allowlist.
+title = "aws-security-findings-platform"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Redacted placeholder values used in CloudTrail test fixtures (not real credentials)"
+regexes = [
+  '''ASIAEXAMPLEACCESSKEY''',
+]
