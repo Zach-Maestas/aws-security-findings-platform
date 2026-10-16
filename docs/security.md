@@ -21,7 +21,7 @@ Threats considered:
 | State file tampering or loss | Terraform state is the source of truth; corrupting it is as damaging as deleting resources |
 
 Explicitly out of scope for now: application security, data protection, and runtime
-threat detection. Those return with the application and security-ops layers.
+threat detection. Those arrive with the deployed application in Phase 2.
 
 ---
 
@@ -125,6 +125,14 @@ jobs that never talk to AWS are not given the ability to.
 
 ---
 
+## Application Security
+
+Added in Phase 2 alongside the deployed API: API-key authentication with two roles,
+a status-history audit trail, input validation, database credentials in Secrets Manager,
+and how detections become findings and trigger remediation. See [roadmap.md](./roadmap.md).
+
+---
+
 ## Known Gaps
 
 Tracked deliberately rather than left implicit.
@@ -134,6 +142,6 @@ Tracked deliberately rather than left implicit.
 | Network write actions use `Resource: "*"` | The deploy role can delete VPCs it did not create | Tag conditions via `aws:RequestTag` / `aws:ResourceTag`, once resources carry the `Project` tag |
 | `ec2:CreateTags` unconstrained | A role that can tag anything can tag past its own tag conditions | Constrain with `ec2:CreateAction` alongside the tag conditions |
 | GitHub Actions pinned to mutable tags | A compromised tag changes what runs in the pipeline | Pin to commit SHAs |
-| No CloudTrail trail | Only 90-day Event history; no data events, no IAM Access Analyzer policy generation | Returns with the security-ops layer |
+| No CloudTrail trail | Only 90-day Event history; no data events, no IAM Access Analyzer policy generation | Phase 2 — the detection pipeline (EventBridge → SQS) depends on it |
 | Local break-glass path uses admin credentials | Bypasses the OIDC posture the pipeline enforces | Accepted; documented in the Makefile |
 | Permissions boundary currently inert | No active defense today | Resolves when IAM-creating modules land |

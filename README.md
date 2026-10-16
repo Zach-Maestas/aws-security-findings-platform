@@ -1,18 +1,30 @@
 # 🛡️ AWS Security Findings Platform
 
-A production-oriented cloud security findings and remediation platform: detects risky AWS activity, records and manages findings through a backend API, and performs reliable automated remediation. Combines backend software engineering (Python/FastAPI, PostgreSQL, Redis, Go workers) with infrastructure/platform engineering (AWS, Terraform, CI/CD, eventually Kubernetes/EKS).
+A production-oriented cloud security findings and remediation platform: detects risky AWS activity, records and manages findings through a backend API, and performs reliable automated remediation. Combines backend software engineering (Python/FastAPI, PostgreSQL, SQS, Redis) with infrastructure/platform engineering (AWS, Terraform, CI/CD, Kubernetes/EKS).
 
-Formerly "AWS Cloud Security Operations & DevSecOps Project" — renamed to match the direction laid out in the project's phase roadmap (Phase 0: refactor/rescope, Phase 1: backend foundation, and onward). The OIDC-authenticated CI/CD bootstrap and Terraform state backend are deployed; the network foundation is defined and pending its first apply. The application, data, and security-ops layers are being rebuilt from scratch on top of them.
+The OIDC-authenticated CI/CD pipeline and Terraform state backend are deployed, and the network foundation is defined and pending its first apply. The findings API is being built next. See the [Roadmap](#roadmap).
 
 ## Current State
 
 | Layer | Status |
 |-------|--------|
-| Network (VPC, subnets, IGW, NAT) | 🚧 Defined, pending first apply — see [Architecture](#architecture) |
-| CI/CD (GitHub Actions OIDC, Terraform remote state) | ✅ Deployed — state locking migrated to S3 native lockfiles |
-| Compute, Data, Secrets, ACM/TLS | 🚧 Removed, being redesigned |
-| Detection & response (CloudTrail, GuardDuty, Security Hub, automated remediation) | 🚧 Removed, logging/monitoring being redesigned |
-| Container scanning (Trivy) | 🚧 Removed from CI until there's an image to scan again |
+| CI/CD (GitHub Actions OIDC, Terraform remote state) | ✅ Deployed — S3 native state locking |
+| Network (VPC, subnets, IGW, NAT) | 🚧 Defined, pending first apply |
+| Findings API (FastAPI, PostgreSQL) | 🚧 Phase 1 — in progress |
+| Compute, data, secrets (ECS, RDS, Secrets Manager) | Planned — Phase 2 |
+| Detection & remediation (CloudTrail, EventBridge, SQS) | Planned — Phase 2 |
+| Container scanning (Trivy) | Planned — Phase 1, once there is an image to scan |
+
+## Roadmap
+
+| Phase | Focus | Status |
+|---|---|---|
+| 0 | Baseline: fixtures, data model decisions, docs cleanup | 🚧 In progress |
+| 1 | Backend + tests: FastAPI, PostgreSQL, dedup, CI test gates, Redis | Planned |
+| 2 | End-to-end MVP: ECS + RDS, EventBridge → SQS ingest, remediation, auth, audit trail | Planned |
+| 3 | Kubernetes + observability: kind, EKS, Prometheus/Grafana | Planned |
+
+Scope and "done" criteria for each phase: [docs/roadmap.md](./docs/roadmap.md).
 
 ## Architecture
 
@@ -52,23 +64,25 @@ More controls (secrets management, TLS, container scanning, audit logging, threa
 Project naming (used to prefix every AWS resource, the state bucket, and the IAM roles) is set once in `infrastructure/terraform/terraform.tfvars` — no code edit needed to rename or fork this project. `infrastructure/terraform/ci-oidc/terraform.tfvars` and `infrastructure/terraform/bootstrap/terraform.tfvars` control the bootstrap layer the same way.
 
 ### Deploy
+First-time setup applies the bootstrap layers in order — see [docs/deployment.md](./docs/deployment.md).
+
+After that, infrastructure is deployed by the GitHub Actions **Deploy Infrastructure** workflow, dispatched from `main`. It authenticates through OIDC, so no AWS credentials are stored or needed locally.
+
+### Break-glass (local)
 ```bash
 make deploy
-```
-Manual/break-glass path only — see the Makefile. The primary deploy path is the GitHub Actions "Deploy Infrastructure" workflow (OIDC-authenticated, no local credentials needed), dispatched from `main`.
-
-First-time setup requires applying the bootstrap layers in order — see [docs/deployment.md](./docs/deployment.md).
-
-### Destroy
-```bash
 make destroy
 ```
+These run with your own credentials and are only for when Actions is unavailable — see the Makefile.
+
+### Run the API locally
+See [application/README.md](./application/README.md).
 
 ## Known Limitations
 
 - Single environment (dev) — multi-environment separation is out of scope for this project
 - Cost-optimized for portfolio use — designed for full teardown/rebuild, not persistent uptime
-- Application, data, and security-ops layers are mid-rebuild; see [Current State](#current-state)
+- Application, data, and detection layers are being built in phases; see the [Roadmap](#roadmap)
 
 ## Tech Stack
 
@@ -83,9 +97,14 @@ make destroy
 
 ```
 .
+├── application/              # FastAPI findings service (Python, uv)
+│   └── src/findings_platform/
 ├── docs/
-│   ├── deployment.md         # Provisioning order, deploy paths, troubleshooting
-│   └── security.md           # Threat model, IAM design, known gaps
+│   ├── roadmap.md            # Phases and done criteria
+│   ├── data-model.md         # Schema, lifecycle, deduplication
+│   ├── api.md                # REST conventions and endpoints
+│   ├── security.md           # Threat model, IAM design, known gaps
+│   └── deployment.md         # Provisioning order, deploy paths, troubleshooting
 ├── infrastructure/
 │   └── terraform/            # Root config — the platform (remote state)
 │       ├── bootstrap/        # S3 state bucket (local state)
@@ -102,4 +121,4 @@ make destroy
 
 ## Related Projects
 
-This project builds on [Secure AWS Architecture Capstone](https://github.com/Zach-Maestas/secure-aws-architecture-capstone), which established the foundational VPC architecture and EC2-based deployment. That work was extended to ECS Fargate with secrets injection, which has since been torn out and is being rebuilt here with deeper backend engineering.
+This project builds on [Secure AWS Architecture Capstone](https://github.com/Zach-Maestas/secure-aws-architecture-capstone), which established the foundational VPC architecture, an ECS Fargate deployment with secrets injection, and automated remediation pipelines. That work is being rebuilt here around a backend findings service.
