@@ -8,14 +8,39 @@ and [docs/api.md](../docs/api.md).
 
 ## Prerequisites
 
-<!-- uv, Docker, Python version -->
+- [uv](https://docs.astral.sh/uv/) 0.13.1
+- Docker
+- Python 3.13 (uv installs it automatically if missing)
 
 ## Running Locally
 
-<!-- docker compose up, environment variables (.env.example), where /docs is served -->
+All commands run from the `application/` directory.
+
+**Development server** (auto-reloads on code changes):
 
 ```bash
+uv sync
+uv run uvicorn findings_platform.main:app --reload
 ```
+
+**Container** (production-style, no reload):
+
+```bash
+docker build -t findings-api .
+docker run --rm -p 8000:8000 findings-api
+```
+
+Either way, the interactive API docs are at http://localhost:8000/docs.
+Logs are written to stdout as JSON.
+
+**Environment:** settings are read from environment variables, with defaults for
+everything, so no `.env` file is needed to run. To override values locally, copy
+`.env.example` to `.env`. In AWS, the same variables are set by the ECS task definition.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_NAME` | `AWS Security Findings Platform` | Title shown in the API docs |
+| `LOG_LEVEL` | `INFO` | Minimum log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ## Database Migrations
 
@@ -33,4 +58,13 @@ and [docs/api.md](../docs/api.md).
 
 ## Project Layout
 
-<!-- api/, core/, db/, models/, schemas/, services/ — what belongs in each -->
+```
+src/findings_platform/
+├── main.py      # creates the FastAPI app and mounts the routers
+├── api/         # HTTP routes: business endpoints under v1/; /health and /ready unversioned
+├── core/        # settings, custom exceptions, and JSON logging setup
+├── db/          # database engine and session setup
+├── models/      # SQLAlchemy models (database tables)
+├── schemas/     # Pydantic models for request and response JSON
+└── services/    # business logic: parsing events, fingerprinting, matching findings
+```
