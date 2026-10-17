@@ -20,7 +20,8 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log = {
             "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
+                record.created,
+                tz=timezone.utc,  # noqa: UP017
             ).isoformat(),
             "level": record.levelname,
             "logger": record.name,
@@ -34,7 +35,7 @@ class JsonFormatter(logging.Formatter):
         # add extras passed via `logger.info(..., extra={...})`
         log |= {k: v for k, v in record.__dict__.items() if k not in _RESERVED}
 
-        return json.dumps(log)
+        return json.dumps(log, default=str)
 
 
 def configure_logging(level: str) -> None:
