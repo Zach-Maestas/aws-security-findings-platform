@@ -19,7 +19,7 @@ The OIDC-authenticated CI/CD pipeline and Terraform state backend are deployed, 
 
 | Phase | Focus | Status |
 |---|---|---|
-| 0 | Baseline: fixtures, data model decisions, docs cleanup | 🚧 In progress |
+| 0 | Baseline: fixtures, data model decisions, docs cleanup | ✅ Done |
 | 1 | Backend + tests: FastAPI, PostgreSQL, dedup, CI test gates, Redis | Planned |
 | 2 | End-to-end MVP: ECS + RDS, EventBridge → SQS ingest, remediation, auth, audit trail | Planned |
 | 3 | Kubernetes + observability: kind, EKS, Prometheus/Grafana | Planned |

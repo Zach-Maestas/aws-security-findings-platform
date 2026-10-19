@@ -1,16 +1,13 @@
 # Data Model
 
-<!-- What the database stores and the rules it enforces. The ER diagram is the
-     source of truth for shape; this doc explains the why. -->
-
 ---
 
 ## ER Diagram
 ```mermaid
 erDiagram
-    FINDING ||--o{ EVENT : "has"
-    FINDING {
-        int id PK
+    FINDINGS ||--o{ EVENTS : "has"
+    FINDINGS {
+        uuid id PK
         enum detection_type
         enum severity
         enum status
@@ -24,9 +21,9 @@ erDiagram
         timestamptz last_seen_at
         timestamptz resolved_at
     }
-    EVENT {
-        int id PK
-        int finding_id FK
+    EVENTS {
+        uuid id PK
+        uuid finding_id FK
         text cloudtrail_event_id UK
         text event_name
         timestamptz event_time
@@ -40,12 +37,10 @@ erDiagram
 
 ## Entities
 
-<!-- For each entity: what one row represents, who creates it, and when it changes. -->
-
 ### Finding
 **What one row represents**: one problem, as defined by its fingerprint.
 **What creates it**: ingest, when a risky event arrives with no matchable finding for its fingerprint. The finding and its first event are inserted in one transaction.
-**When it changes**: `last_seen_at` when a new event matches; `status` (with `updated_at` and `resolved_at`) through lifecycle transitions; `severity` can rise when a matching event is more severe; remediation results arrive in Phase 2.
+**When it changes**: `last_seen_at` when a new event matches, set to the later of its current value and the event’s `eventTime` (CloudTrail time, not ingest time); `status` (with `updated_at` and `resolved_at`) through lifecycle transitions; `severity` can rise when a matching event is more severe; remediation results arrive in Phase 2.
 **What `resource` holds**: the normalized ARN of the affected resource. For AdminAccess this is the principal ARN, since the principal is what remediation acts on.
 **What `account` and `region` hold**: copies of values in the `resource` ARN, kept as columns for filtering. `region` is NULL for IAM findings, since IAM resources are global.
 
@@ -58,8 +53,6 @@ erDiagram
 ---
 
 ## Enumerations
-
-<!-- Allowed values and what each one means. -->
 
 | Enum | Values | Notes |
 |---|---|---|
@@ -102,9 +95,6 @@ Transition details (who, when, notes) are recorded by the status-history table i
 
 ## Deduplication and Fingerprinting
 
-<!-- How `fingerprint` is computed, why repeated events collapse onto one finding,
-     and how `last_seen_at` / `cloudtrail_event_id` uniqueness support that. -->
-
 ### Normalization
 
 Every identifier in a fingerprint is converted to its full ARN, so the same resource
@@ -141,16 +131,16 @@ intentionally empty.
 
 | Table | Constraint / Index | Purpose |
 |---|---|---|
-| `finding` | PK `id` | Row identity |
-| `finding` | NOT NULL on `detection_type`, `severity`, `status`, `fingerprint`, `account`, `resource`, `created_at`, `updated_at`, `last_seen_at` | Every finding is fully identified |
-| `finding` | Partial UNIQUE on `fingerprint` WHERE `status IN ('OPEN', 'SUPPRESSED')` | At most one matchable finding per problem, even under concurrent ingest; also serves the ingest lookup |
-| `finding` | CHECK `(status = 'SUPPRESSED') = (suppression_reason IS NOT NULL)` | Reason present exactly when suppressed |
-| `finding` | CHECK `(status = 'RESOLVED') = (resolved_at IS NOT NULL)` | `resolved_at` present exactly when resolved |
-| `finding` | CHECK `(detection_type = 'ADMIN_ACCESS_GRANTED') = (region IS NULL)` | IAM findings have no region; all others must |
-| `event` | PK `id` | Row identity |
-| `event` | UNIQUE `cloudtrail_event_id` | Rejects duplicate delivery of the same CloudTrail event |
-| `event` | FK `finding_id` → `finding.id`, NOT NULL | Every stored event belongs to a finding |
-| `event` | Index on `finding_id` | Loading a finding's events (Postgres does not index foreign keys automatically) |
+| `findings` | PK `id` | Row identity |
+| `findings` | NOT NULL on `detection_type`, `severity`, `status`, `fingerprint`, `account`, `resource`, `created_at`, `updated_at`, `last_seen_at` | Every finding is fully identified |
+| `findings` | Partial UNIQUE on `fingerprint` WHERE `status IN ('OPEN', 'SUPPRESSED')` | At most one matchable finding per problem, even under concurrent ingest; also serves the ingest lookup |
+| `findings` | CHECK `(status = 'SUPPRESSED') = (suppression_reason IS NOT NULL)` | Reason present exactly when suppressed |
+| `findings` | CHECK `(status = 'RESOLVED') = (resolved_at IS NOT NULL)` | `resolved_at` present exactly when resolved |
+| `findings` | CHECK `(detection_type = 'ADMIN_ACCESS_GRANTED') = (region IS NULL)` | IAM findings have no region; all others must |
+| `events` | PK `id` | Row identity |
+| `events` | UNIQUE `cloudtrail_event_id` | Rejects duplicate delivery of the same CloudTrail event |
+| `events` | FK `finding_id` → `findings.id`, NOT NULL | Every stored event belongs to a finding |
+| `events` | Index on `finding_id` | Loading a finding's events (Postgres does not index foreign keys automatically) |
 
 Indexes for list filtering (status, severity, `last_seen_at`) are added in 1.6, once the queries exist.
 

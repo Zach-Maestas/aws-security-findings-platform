@@ -5,6 +5,7 @@ from findings_platform.core.config import settings
 from findings_platform.core.logging_config import configure_logging
 
 configure_logging(settings.log_level)
+
 app = FastAPI(title=settings.app_name)
 
 app.include_router(health.router)
