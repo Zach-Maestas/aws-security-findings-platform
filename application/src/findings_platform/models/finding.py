@@ -67,7 +67,7 @@ class Finding(Base):
         ),
         # region is NULL exactly for IAM (global) findings.
         CheckConstraint(
-            "(detection_type = 'ADMIN_ACCESS_GRANTED') = (resolved_at IS NULL)",
+            "(detection_type = 'ADMIN_ACCESS_GRANTED') = (region IS NULL)",
             name="ck_findings_region_null_only_for_admin",
         ),
     )
