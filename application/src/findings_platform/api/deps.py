@@ -7,11 +7,10 @@ from sqlalchemy.orm import Session
 from findings_platform.db.session import SessionLocal
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     with SessionLocal() as session:
         yield session
 
 
-DbSession = Annotated[
-    Session, Depends(get_db)
-]  # FastAPI reads metadata at runtime; it will call get_db() on each request and pass result as 'db'.
+# FastAPI calls get_db() on each request and passes the session to the endpoint.
+DbSession = Annotated[Session, Depends(get_db)]
