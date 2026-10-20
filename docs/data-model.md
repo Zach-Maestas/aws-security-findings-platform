@@ -27,6 +27,7 @@ erDiagram
         text cloudtrail_event_id UK
         text event_name
         timestamptz event_time
+        text actor_type
         text actor
         text source_ip
         jsonb raw_event
@@ -49,6 +50,8 @@ erDiagram
 **What creates it**: ingest, for every risky event that passes the duplicate check.
 **When it changes**: never. Events are an immutable record.
 **Benign events**: only events that produce or match a finding are stored; benign events are dropped. CloudTrail is the system of record for all API activity. As a result, `finding_id` is NOT NULL.
+**Who acted (`actor_type`, `actor`)**: `actor_type` is CloudTrail's `userIdentity.type` (`IAMUser`, `AssumedRole`, `Root`, `AWSService`, ...). `actor` is `userIdentity.arn`, or `userIdentity.invokedBy` for `AWSService` calls, which have no ARN; read it together with `actor_type`. `actor_type` is text rather than an enum because AWS adds identity types, and an enum would reject real events. It also makes root activity, a high-signal event, a simple filter.
+**Why `source_ip` is text**: CloudTrail sends a service name (e.g. `AWS Internal`) instead of an IP for some calls, which an `INET` column would reject. Switch to `INET` if IP-range queries are needed; the original value is always in `raw_event`.
 
 ---
 
