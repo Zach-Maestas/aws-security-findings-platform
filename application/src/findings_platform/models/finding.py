@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import CheckConstraint, DateTime, Index, func, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from findings_platform.db.base import Base
 from findings_platform.models.enums import (
@@ -11,6 +12,9 @@ from findings_platform.models.enums import (
     Status,
     SuppressionReason,
 )
+
+if TYPE_CHECKING:
+    from findings_platform.models.event import Event
 
 
 class Finding(Base):
@@ -22,6 +26,7 @@ class Finding(Base):
     detection_type: Mapped[DetectionType] = mapped_column()
     # Only rises: a matching event sets it to the higher of the two.
     severity: Mapped[Severity] = mapped_column()
+    events: Mapped[list["Event"]] = relationship(back_populates="finding")
     status: Mapped[Status] = mapped_column(server_default="OPEN")
     # "{DETECTION_TYPE}|{normalized ARN}[|...]", stored as plain text for debugging.
     fingerprint: Mapped[str] = mapped_column()

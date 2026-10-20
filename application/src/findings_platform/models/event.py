@@ -1,32 +1,42 @@
-from enum import Enum
+import uuid
+from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey, Index
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from findings_platform.db.base import Base
 
-class Severity(Enum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-    CRITICAL = "CRITICAL"
-
-
-class DetectionType(Enum):
-    CLOUDTRAIL_LOGGING_STOPPED = "CLOUDTRAIL_LOGGING_STOPPED"
-    ADMIN_ACCESS_GRANTED = "ADMIN_ACCESS_GRANTED"
-    SG_OPEN_TO_WORLD = "SG_OPEN_TO_WORLD"
+if TYPE_CHECKING:
+    from findings_platform.models.finding import Finding
 
 
-class Status(Enum):
-    OPEN = "OPEN"
-    RESOLVED = "RESOLVED"
-    SUPPRESSED = "SUPPRESSED"
+class Event(Base):
+    """One CloudTrail record, linked to the finding it caused. Immutable once stored.
+    See docs/data-model.md."""
 
+    __tablename__ = "events"
 
-class SuppressionReason(Enum):
-    ACCEPTED_RISK = "ACCEPTED_RISK"
-    FALSE_POSITIVE = "FALSE_POSITIVE"
-    INTENDED = "INTENDED"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # NOT NULL: benign events are dropped, so every stored event has a finding.
+    finding_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("findings.id"))
+    finding: Mapped["Finding"] = relationship(back_populates="events")
+    # CloudTrail's eventID; UNIQUE rejects duplicate delivery of the same event.
+    cloudtrail_event_id: Mapped[str] = mapped_column(unique=True)
+    event_name: Mapped[str] = mapped_column()
+    # CloudTrail's eventTime, not ingest time. Drives the finding's last_seen_at.
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actor: Mapped[str] = mapped_column()
+    source_ip: Mapped[str] = mapped_column()
+    # Full original record, kept for audit and for fields not promoted to columns.
+    raw_event: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
-
-class Event:
-    id: Mapped[int] = mapped_column(primary_key=True)
+    __table_args__ = (
+        # Postgres does not index foreign keys automatically; this serves loading
+        # a finding's events.
+        Index(
+            "ix_events_finding_id",
+            "finding_id",
+        ),
+    )
