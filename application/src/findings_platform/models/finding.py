@@ -26,7 +26,10 @@ class Finding(Base):
     detection_type: Mapped[DetectionType] = mapped_column()
     # Only rises: a matching event sets it to the higher of the two.
     severity: Mapped[Severity] = mapped_column()
-    events: Mapped[list["Event"]] = relationship(back_populates="finding")
+    events: Mapped[list["Event"]] = relationship(
+        back_populates="finding",
+        order_by="Event.event_time",
+    )
     status: Mapped[Status] = mapped_column(server_default="OPEN")
     # "{DETECTION_TYPE}|{normalized ARN}[|...]", stored as plain text for debugging.
     fingerprint: Mapped[str] = mapped_column()
