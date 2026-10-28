@@ -21,6 +21,8 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src/ /app/src/
 RUN uv sync --frozen --no-dev
+COPY alembic/ /app/alembic/
+COPY alembic.ini ./
 
 USER appuser
 
