@@ -1,6 +1,14 @@
-from fastapi import APIRouter
+import logging
+
+from fastapi import APIRouter, HTTPException
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
+from findings_platform.api.deps import DbSession
 
 router = APIRouter(tags=["health"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("/health")
@@ -9,6 +17,13 @@ def health():
 
 
 @router.get("/ready")
-def ready():
-    # TODO (1.2): check the database connection; return 503 if it fails
-    return {"status": "ready"}
+def readiness_check(db: DbSession):
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready"}
+    except SQLAlchemyError as e:
+        logger.warning(
+            "Readiness check failed: database unavailable",
+            extra={"check": "database", "error": str(e)},
+        )
+        raise HTTPException(status_code=503, detail="Database unavailable") from e

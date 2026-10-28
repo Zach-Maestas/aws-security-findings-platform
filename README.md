@@ -1,6 +1,6 @@
 # 🛡️ AWS Security Findings Platform
 
-A production-oriented cloud security findings and remediation platform: detects risky AWS activity, records and manages findings through a backend API, and performs reliable automated remediation. Combines backend software engineering (Python/FastAPI, PostgreSQL, SQS, Redis) with infrastructure/platform engineering (AWS, Terraform, CI/CD, Kubernetes/EKS).
+A production-oriented cloud security findings and remediation platform: detects risky AWS activity, records and manages findings through a backend API, and performs reliable automated remediation. Combines backend software engineering (Python/FastAPI, PostgreSQL, SQS) with infrastructure/platform engineering (AWS, Terraform, ECS Fargate, CI/CD).
 
 The OIDC-authenticated CI/CD pipeline and Terraform state backend are deployed, and the network foundation is defined and pending its first apply. The findings API is being built next. See the [Roadmap](#roadmap).
 
@@ -19,12 +19,11 @@ The OIDC-authenticated CI/CD pipeline and Terraform state backend are deployed, 
 
 | Phase | Focus | Status |
 |---|---|---|
-| 0 | Baseline: fixtures, data model decisions, docs cleanup | 🚧 In progress |
-| 1 | Backend + tests: FastAPI, PostgreSQL, dedup, CI test gates, Redis | Planned |
+| 0 | Baseline: fixtures, data model decisions, docs cleanup | ✅ Done |
+| 1 | Backend + tests: FastAPI, PostgreSQL, dedup, CI test gates | 🚧 In progress |
 | 2 | End-to-end MVP: ECS + RDS, EventBridge → SQS ingest, remediation, auth, audit trail | Planned |
-| 3 | Kubernetes + observability: kind, EKS, Prometheus/Grafana | Planned |
 
-Scope and "done" criteria for each phase: [docs/roadmap.md](./docs/roadmap.md).
+Scope, "done" criteria, and what is deliberately out of scope: [docs/roadmap.md](./docs/roadmap.md).
 
 ## Architecture
 
