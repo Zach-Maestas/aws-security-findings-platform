@@ -151,5 +151,30 @@ Indexes for list filtering (status, severity, `last_seen_at`) are added in 1.6, 
 
 ## Migrations
 
-<!-- Alembic workflow: how to generate, review, and apply a migration,
-     and the rules for changes that aren't backwards compatible. -->
+Schema changes go through Alembic. Run commands from `application/`. Alembic reads `DATABASE_URL` through `findings_platform` settings (see `alembic/env.py`), never from `alembic.ini`. On the host, the URL in `.env` points at `localhost:5432`; the `api` container builds its own URL with host `db`.
+
+| Command | Purpose |
+|---|---|
+| `uv run alembic revision --autogenerate -m "<message>"` | Write a new migration by comparing the models to the database |
+| `uv run alembic upgrade head --sql` | Preview the SQL without touching the database |
+| `uv run alembic upgrade head` | Apply all pending migrations |
+| `uv run alembic downgrade -1` | Undo the most recent migration |
+| `uv run alembic downgrade base` | Undo every migration (local reset only; drops all data) |
+| `uv run alembic current` | Show the applied revision |
+
+**Workflow:**
+
+1. Change the models, then autogenerate a migration.
+2. Read every line of the generated file. Autogenerate is a first draft. Check:
+   - constraint and index names follow the naming convention in `db/base.py` (no `None`)
+   - partial indexes keep their `postgresql_where`
+   - `downgrade()` reverses `upgrade()` in the opposite order
+   - if the migration creates a Postgres enum type, `downgrade()` drops it after the tables that use it. `drop_table` does not drop the type, and autogenerate omits it.
+   - renames: autogenerate reads a renamed column as a drop plus an add, which loses data. Rewrite it as `op.alter_column(..., new_column_name=...)`.
+3. Preview with `upgrade head --sql`.
+4. Apply, then run `downgrade -1` and `upgrade head` again to prove the downgrade works.
+5. Commit the migration in the same PR as the model change.
+
+**Rule:** never edit a migration after it has been applied to a shared database (CI, staging, production). Write a new migration instead.
+
+<!-- TODO: rules for changes that aren't backwards compatible (expand/contract), added with the first such change. -->
