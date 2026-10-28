@@ -66,16 +66,16 @@ class Finding(Base):
         # suppression_reason is present exactly when SUPPRESSED.
         CheckConstraint(
             "(status = 'SUPPRESSED') = (suppression_reason IS NOT NULL)",
-            name="ck_findings_suppressed_has_reason",
+            name="suppressed_has_reason",
         ),
         # resolved_at is present exactly when RESOLVED.
         CheckConstraint(
             "(status = 'RESOLVED') = (resolved_at IS NOT NULL)",
-            name="ck_findings_resolved_has_resolved_at",
+            name="resolved_has_resolved_at",
         ),
         # region is NULL exactly for IAM (global) findings.
         CheckConstraint(
             "(detection_type = 'ADMIN_ACCESS_GRANTED') = (region IS NULL)",
-            name="ck_findings_region_null_only_for_admin",
+            name="region_null_only_for_admin",
         ),
     )
