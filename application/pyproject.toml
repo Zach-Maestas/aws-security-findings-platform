@@ -3,9 +3,7 @@ name = "findings_platform"
 version = "0.1.0"
 description = "Backend API for managing cloud security findings and incidents"
 readme = "README.md"
-authors = [
-    { name = "Zach-Maestas", email = "zachary.maestas03@gmail.com" }
-]
+authors = [{ name = "Zach-Maestas", email = "zachary.maestas03@gmail.com" }]
 requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.20.0",
@@ -22,5 +20,11 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.0",
+    "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
