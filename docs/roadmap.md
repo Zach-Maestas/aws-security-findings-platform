@@ -43,10 +43,11 @@ is skipped, and a broken change fails the PR.
 - ECS Fargate and RDS deployed through GitHub Actions, using layered Terraform stacks
   (network → data → app), with the deploy role's IAM expanded in the same PRs
 - One NAT gateway, a destroy workflow, and an AWS Budgets alert
-- EventBridge → SQS (with a DLQ) → consumer, as the single path for every event: the
-  consumer records the finding, then runs the capstone's remediation for that
-  detection and records the result on the finding. A duplicate message must not create
-  a duplicate finding or remediate twice
+- EventBridge → SNS → SQS (with a DLQ) → consumer, as the single path for every event.
+  SNS fans out to two subscribers: the SQS queue for processing, and an email
+  subscription that alerts on each detection. The consumer records the finding, then
+  runs the capstone's remediation for that detection and records the result on the
+  finding. A duplicate message must not create a duplicate finding or remediate twice
 - Correlation IDs carried from the API through SQS to the consumer, so one event can be
   traced end to end in the logs
 - API-key auth with two roles, a status-history table for the audit trail, and
