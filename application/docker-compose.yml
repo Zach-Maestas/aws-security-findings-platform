@@ -5,7 +5,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-findings}
       POSTGRES_USER: ${POSTGRES_USER:-findings_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-    volumes:        
+    volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -15,6 +15,24 @@ services:
       start_period: 10s
     ports:
       - "127.0.0.1:5432:5432"
+  
+  test-db:
+    image: postgres:17 
+    environment:
+      POSTGRES_DB: findings_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "127.0.0.1:5433:5432"
+    profiles: ["test"]
 
   migrate:
     image: findings-platform:local
