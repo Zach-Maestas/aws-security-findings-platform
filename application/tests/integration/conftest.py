@@ -5,11 +5,12 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from findings_platform.api.deps import get_db
-from findings_platform.main import app
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
+
+from findings_platform.api.deps import get_db
+from findings_platform.main import app
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",

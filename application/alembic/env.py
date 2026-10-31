@@ -1,10 +1,11 @@
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import create_engine, pool
+
 from findings_platform.core.config import settings
 from findings_platform.db.base import Base
 from findings_platform.models import Event, Finding  # noqa: F401 -- needed to register tables.
-from sqlalchemy import create_engine, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,7 +19,10 @@ target_metadata = Base.metadata
 
 
 def get_db_url() -> str:
-    """An explicit URL from the Alembic config (set by tests) wins; otherwise use settings."""
+    """
+    An explicit URL from the Alembic config (set by tests) wins;
+    otherwise use settings.
+    """
 
     return config.get_main_option("sqlalchemy.url") or settings.database_url
 

@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from findings_platform.main import app
 
 
