@@ -1,10 +1,11 @@
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import create_engine, pool
+
 from findings_platform.core.config import settings
 from findings_platform.db.base import Base
 from findings_platform.models import Event, Finding  # noqa: F401 -- needed to register tables.
-from sqlalchemy import engine_from_config, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -12,9 +13,18 @@ config = context.config
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
+
+
+def get_db_url() -> str:
+    """
+    An explicit URL from the Alembic config (set by tests) wins;
+    otherwise use settings.
+    """
+
+    return config.get_main_option("sqlalchemy.url") or settings.database_url
 
 
 def run_migrations_offline() -> None:
@@ -29,9 +39,8 @@ def run_migrations_offline() -> None:
     script output.
     """
 
-    url = settings.database_url
     context.configure(
-        url=url,
+        url=get_db_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -48,15 +57,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
     """
 
-    # Set database URL from settings.
-    ini_section = config.get_section(config.config_ini_section, {})
-    ini_section["sqlalchemy.url"] = settings.database_url
-
-    connectable = engine_from_config(
-        ini_section,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(get_db_url(), poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

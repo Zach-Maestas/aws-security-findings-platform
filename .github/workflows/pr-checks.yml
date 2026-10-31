@@ -1,4 +1,4 @@
-name: PR Security Checks
+name: PR Checks
 
 on:
   pull_request:
@@ -13,6 +13,59 @@ env:
   PROJECT: ${{ vars.PROJECT }}
 
 jobs:
+  # ===========================================================================
+  # Application unit and integration tests
+  # ===========================================================================
+  app-tests:
+    name: Application Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: findings_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/findings_test
+      DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/findings_test
+    defaults:
+      run:
+        working-directory: application
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run tests
+        run: uv run pytest
+
+  # ===========================================================================
+  # Application Lint: Ruff lint and format checks
+  # ===========================================================================
+  app-lint:
+    name: Application Lint (Ruff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: application
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Ruff lint check
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
   # ===========================================================================
   # Terraform Format and Validate
   # ===========================================================================
@@ -79,14 +132,25 @@ jobs:
 
   # ===========================================================================
   # Container Security: build and scan Docker images for CVEs
-  # ---------------------------------------------------------------------------
-  # Intentionally removed for now — application/backend and the db-init image
-  # were torn out along with the app/data layers during the backend rescope,
-  # so there's nothing to build or scan. Re-add a `trivy` job here (build
-  # each service image, then aquasecurity/trivy-action per image) once the
-  # new backend has a Dockerfile again. See git history on this file for the
-  # original job definition to crib from.
   # ===========================================================================
+
+  trivy:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build application image
+        run: docker build -t findings-platform:ci ./application
+
+      - name: Scan application image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: findings-platform:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
   # ===========================================================================
   # Terraform Plan: show what will change in AWS

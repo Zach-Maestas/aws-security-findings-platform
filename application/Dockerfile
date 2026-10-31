@@ -24,6 +24,8 @@ RUN uv sync --frozen --no-dev
 COPY alembic/ /app/alembic/
 COPY alembic.ini ./
 
+RUN /usr/local/bin/python -m pip uninstall -y pip
+
 USER appuser
 
 EXPOSE 8000
