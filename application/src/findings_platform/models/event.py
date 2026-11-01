@@ -19,31 +19,29 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    # NOT NULL: benign events are dropped, so every stored event has a finding.
-    finding_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("findings.id"))
-    finding: Mapped["Finding"] = relationship(back_populates="events")
     # CloudTrail's eventID; UNIQUE rejects duplicate delivery of the same event.
     cloudtrail_event_id: Mapped[str] = mapped_column(unique=True)
+    # NOT NULL: benign events are dropped, so every stored event has a finding.
+    finding_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("findings.id"))
+
     event_name: Mapped[str] = mapped_column()
     # CloudTrail's eventTime, not ingest time. Drives the finding's last_seen_at.
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # CloudTrail's userIdentity.type (IAMUser, AssumedRole, Root, AWSService, ...).
-    # Text, not an enum: AWS adds identity types, and an enum would reject them.
+
+    # userIdentity.type (IAMUser, AssumedRole, Root, AWSService, ...). Text, not
+    # an enum: AWS adds identity types, and an enum would reject them.
     actor_type: Mapped[str] = mapped_column()
     # userIdentity.arn, or userIdentity.invokedBy for AWSService calls (no ARN).
-    # Interpret it using actor_type.
     actor: Mapped[str] = mapped_column()
-    # Text, not INET: CloudTrail sends a service name (e.g. "AWS Internal")
-    # instead of an IP for some calls.
+    # Text, not INET: some calls send a service name (e.g. "AWS Internal").
     source_ip: Mapped[str] = mapped_column()
+
     # Full original record, kept for audit and for fields not promoted to columns.
     raw_event: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
+    finding: Mapped["Finding"] = relationship(back_populates="events")
+
     __table_args__ = (
-        # Postgres does not index foreign keys automatically; this serves loading
-        # a finding's events.
-        Index(
-            "ix_events_finding_id",
-            "finding_id",
-        ),
+        # Postgres doesn't index foreign keys; this serves loading a finding's events.
+        Index("ix_events_finding_id", "finding_id"),
     )
