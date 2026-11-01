@@ -3,7 +3,7 @@
 FROM python:3.13-slim
 WORKDIR /app
 
-# Create least-privilege user for the container
+# Create least-privilege user for the container, set gecos to empty avoiding interactive creation
 RUN adduser --disabled-password --gecos "" \
     --shell /usr/sbin/nologin appuser
 
@@ -24,6 +24,8 @@ RUN uv sync --frozen --no-dev
 COPY alembic/ /app/alembic/
 COPY alembic.ini ./
 
+# pip is unused at runtime (uv installs dependencies) and its bundled libraries
+# trigger HIGH CVEs in Trivy. Remove it rather than ignore the findings.
 RUN /usr/local/bin/python -m pip uninstall -y pip
 
 USER appuser
