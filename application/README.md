@@ -69,10 +69,43 @@ and rules are in [docs/data-model.md](../docs/data-model.md#migrations).
 
 ## Running Tests
 
-<!-- Unit and integration tests, lint and format -->
+The `Makefile` at the repository root runs the same checks CI runs:
 
 ```bash
+make app-fix       # fix lint issues and format code (changes files)
+make app-check     # ruff check + ruff format --check (changes nothing)
+make test          # start the test database, then run every test
+make test-db-down  # stop the test database
 ```
+
+Or directly, from `application/`:
+
+```bash
+docker compose --profile test up -d --wait test-db
+uv run pytest                     # everything
+uv run pytest tests/unit          # no database needed
+uv run pytest tests/integration   # needs test-db
+```
+
+**Unit vs. integration:** a test that needs the database goes in `tests/integration/`;
+everything else goes in `tests/unit/`. Unit tests run with nothing else running.
+
+**The test database** is a separate `test-db` compose service: Postgres on port 5433,
+database `findings_test`, data in memory (`tmpfs`), started only with the `test` profile.
+It never touches the dev database on port 5432. CI uses an equivalent Postgres service
+container. Point tests elsewhere with `TEST_DATABASE_URL`.
+
+**How integration tests stay isolated** (`tests/integration/conftest.py`):
+
+- The `engine` fixture refuses any database whose name doesn't end in `_test`, then runs
+  `alembic upgrade head` once per test run, so the migrations are tested too.
+- Each test gets a `db_session` inside an outer transaction that is rolled back
+  afterwards. The session joins it with `create_savepoint`, so a `commit()` in application
+  code releases a savepoint instead of committing, and every test starts empty.
+- The integration `client` overrides `get_db`, so endpoints use that session.
+
+**Fixtures:** CloudTrail records in `tests/fixtures/cloudtrail/`, listed with their
+expected results in [docs/data-model.md](../docs/data-model.md#test-fixtures).
 
 ## Project Layout
 

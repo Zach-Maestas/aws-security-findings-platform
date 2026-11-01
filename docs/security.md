@@ -15,7 +15,7 @@ Threats considered:
 | Threat | Concern |
 |---|---|
 | Malicious or compromised pull request | PR-triggered CI runs code from an untrusted branch, with AWS access |
-| Compromised third-party GitHub Action | Actions run in-process and can reach any credential the job holds |
+| Compromised third-party GitHub Action | Actions run in-process and can reach any credential the job holds. This happened to `trivy-action` in 2026; see [Supply Chain](#supply-chain) |
 | Leaked long-lived AWS credentials | A static access key in CI is stealable and rarely rotated |
 | Privilege escalation from CI | A deploy role that can create IAM roles can create a more powerful one |
 | State file tampering or loss | Terraform state is the source of truth; corrupting it is as damaging as deleting resources |
@@ -110,13 +110,18 @@ an IAM grant from the system.
 
 ## Pipeline Controls
 
-Every pull request against `main` must pass, before `terraform plan` runs:
+Every pull request against `main` runs the checks below. A branch ruleset on `main`
+requires them, so a failing check blocks the merge. `terraform plan` runs only after the
+Terraform checks pass.
 
 | Check | Tool |
 |---|---|
 | Formatting and syntax | `terraform fmt -check`, `terraform validate` |
 | Secret detection | Gitleaks, full history |
 | IaC misconfiguration | Checkov |
+| Application tests | pytest, unit and integration, against a Postgres service container |
+| Application lint | Ruff: `ruff check`, `ruff format --check` |
+| Container vulnerabilities | Trivy: fixable CRITICAL and HIGH fail the build |
 
 `GITHUB_TOKEN` permissions default to `contents: read` at workflow level. Only the plan
 job is granted `id-token: write`. The scanning jobs run third-party actions, and any code
@@ -127,9 +132,16 @@ jobs that never talk to AWS are not given the ability to.
 
 ## Application Security
 
-Added in Phase 2 alongside the deployed API: API-key authentication with two roles,
-a status-history audit trail, input validation, database credentials in Secrets Manager,
-and how detections become findings and trigger remediation. See [roadmap.md](./roadmap.md).
+Already in place:
+
+- **Input validation.** Request bodies are validated against Pydantic schemas before any
+  application code runs; invalid input returns `422` without echoing the submitted value.
+- **No internal details in errors.** Unexpected errors return a generic `500`; the
+  traceback goes to the server logs only. See [api.md](./api.md#errors).
+
+Added in Phase 2 alongside the deployed API: API-key authentication with two roles, a
+status-history audit trail, database credentials in Secrets Manager, and remediation. See
+[roadmap.md](./roadmap.md).
 
 ---
 
@@ -141,7 +153,76 @@ Tracked deliberately rather than left implicit.
 |---|---|---|
 | Network write actions use `Resource: "*"` | The deploy role can delete VPCs it did not create | Tag conditions via `aws:RequestTag` / `aws:ResourceTag`, once resources carry the `Project` tag |
 | `ec2:CreateTags` unconstrained | A role that can tag anything can tag past its own tag conditions | Constrain with `ec2:CreateAction` alongside the tag conditions |
-| GitHub Actions pinned to mutable tags | A compromised tag changes what runs in the pipeline | Pin to commit SHAs |
+| Most GitHub Actions pinned to mutable tags | A compromised tag changes what runs in the pipeline (`trivy-action` is already SHA-pinned) | Pin the rest to commit SHAs, with Dependabot proposing updates |
 | No CloudTrail trail | Only 90-day Event history; no data events, no IAM Access Analyzer policy generation | Phase 2 — the detection pipeline (EventBridge → SQS) depends on it |
 | Local break-glass path uses admin credentials | Bypasses the OIDC posture the pipeline enforces | Accepted; documented in the Makefile |
 | Permissions boundary currently inert | No active defense today | Resolves when IAM-creating modules land |
+
+---
+
+## Human Access
+
+People sign in through **AWS IAM Identity Center**, not IAM users:
+
+- **No long-lived credentials.** Each sign-in produces a short-lived role session that
+  expires; there are no static access keys to leak.
+- **MFA at sign-in.** Identity Center enforces MFA before any role session is issued.
+  (CloudTrail's `sessionContext.attributes.mfaAuthenticated` reads `false` for these
+  sessions, because it only reports IAM's own MFA check; MFA happened at the Identity
+  Center sign-in.)
+- **Access through a group.** The `AdministratorAccess` permission set is assigned to the
+  `Admins` group, not to individual users, so access is granted and revoked in one place.
+- **Attributable.** CloudTrail records the role and the person: the session name at the
+  end of `assumed-role/AWSReservedSSO_AdministratorAccess_.../<user>`.
+
+Human access is configured manually as an account baseline, outside this project's
+Terraform. Managing it from the project's pipeline would mean granting the deploy role
+Organizations and SSO-admin permissions, which is the opposite of least privilege. CI uses
+its own OIDC roles (see above). Setup and CLI use are in
+[deployment.md](./deployment.md#human-access).
+
+**Accepted limitation:** the single AWS account is also the Organizations management
+account. In a company, workloads would run in separate member accounts.
+
+---
+
+## Supply Chain
+
+- **Actions pinned by commit SHA.** A version tag is a movable pointer: anyone with write
+  access to an action's repository, or an attacker with stolen access, can move it to
+  different code, and every workflow using the tag runs it. In March 2026,
+  `aquasecurity/trivy-action` had 76 of its 77 tags force-pushed to credential-stealing
+  code (CVE-2026-33634). This project's container scan pins `trivy-action` to a commit
+  SHA, with the version in a comment. Pinning the remaining actions is a known gap below.
+- **Container scanning.** Every PR builds the image and fails on fixable CRITICAL or HIGH
+  vulnerabilities.
+- **Unused tools removed, not suppressed.** Trivy flagged HIGH CVEs in libraries bundled
+  inside pip. The application never runs pip (uv installs dependencies), so pip is
+  uninstalled from the runtime image rather than ignoring the findings.
+- **Non-root container.** The API runs as an unprivileged `appuser`.
+
+---
+
+## Defense in Depth
+
+Detection is the safety net, not the first line:
+
+| Layer | Goal | In this project |
+|---|---|---|
+| **Prevent** | Stop risky changes from happening | Least-privilege CI roles, permissions boundary, Checkov before deploy, short-lived human sessions; region-restricting SCP (Phase 2) |
+| **Detect** | Notice what gets through | CloudTrail-based detections for logging stopped, admin access granted, and security groups opened to the internet |
+| **Respond** | Limit the damage quickly | Automatic remediation and alerting (Phase 2) |
+
+Detection and response take minutes; prevention means most risky changes are never
+possible at all.
+
+---
+
+## Known Detection Limitations
+
+| Limitation | Impact | Planned |
+|---|---|---|
+| EventBridge rules are regional | A security group opened in a region without a rule is not detected | Phase 2: an SCP restricting the account to the regions in use; forward events from any other allowed region |
+| `ModifySecurityGroupRules` does not say whether a rule is inbound or outbound | An outbound rule edited to an open range is reported as a finding | Phase 2: look the rule up with `DescribeSecurityGroupRules` in the consumer |
+| `UpdateAssumeRolePolicy` is not detected | A role's trust policy can be changed to let an outside account assume it | Future: needs a new detection type and trust-policy analysis |
+| Failed attempts are ignored | A burst of `AccessDenied` from one identity, a sign of a probed credential, is not reported | Future: behavioral detection over a time window |
