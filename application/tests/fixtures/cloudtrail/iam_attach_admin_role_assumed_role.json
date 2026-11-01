@@ -1,0 +1,51 @@
+{
+    "eventVersion": "1.11",
+    "userIdentity": {
+        "type": "AssumedRole",
+        "principalId": "AROAEXAMPLEROLEID:example-user",
+        "arn": "arn:aws:sts::111122223333:assumed-role/AWSReservedSSO_AdministratorAccess_0123456789abcdef/example-user",
+        "accountId": "111122223333",
+        "accessKeyId": "ASIAEXAMPLEACCESSKEY",
+        "sessionContext": {
+            "sessionIssuer": {
+                "type": "Role",
+                "principalId": "AROAEXAMPLEROLEID",
+                "arn": "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_0123456789abcdef",
+                "accountId": "111122223333",
+                "userName": "AWSReservedSSO_AdministratorAccess_0123456789abcdef"
+            },
+            "attributes": {
+                "creationDate": "2026-11-01T16:33:11Z",
+                "mfaAuthenticated": "false"
+            }
+        },
+        "onBehalfOf": {
+            "userId": "00000000-0000-0000-0000-000000000000",
+            "identityStoreArn": "arn:aws:identitystore::111122223333:identitystore/d-0000000000"
+        }
+    },
+    "eventTime": "2026-11-01T17:59:54Z",
+    "eventSource": "iam.amazonaws.com",
+    "eventName": "AttachRolePolicy",
+    "awsRegion": "us-east-1",
+    "sourceIPAddress": "203.0.113.10",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "requestParameters": {
+        "roleName": "fixture-test-role",
+        "policyArn": "arn:aws:iam::aws:policy/AdministratorAccess"
+    },
+    "responseElements": null,
+    "requestID": "5ced104e-a3da-457b-9e88-ac3049030f7e",
+    "eventID": "dce31465-fbd7-4f4c-be41-7109b2a8a894",
+    "readOnly": false,
+    "eventType": "AwsApiCall",
+    "managementEvent": true,
+    "recipientAccountId": "111122223333",
+    "eventCategory": "Management",
+    "tlsDetails": {
+        "tlsVersion": "TLSv1.3",
+        "cipherSuite": "TLS_AES_128_GCM_SHA256",
+        "clientProvidedHostHeader": "iam.amazonaws.com"
+    },
+    "sessionCredentialFromConsole": "true"
+}
