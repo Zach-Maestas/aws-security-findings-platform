@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from findings_platform.core.exceptions import AppError
+from findings_platform.core.validation import safe_field_errors
 from findings_platform.schemas.errors import ErrorDetail, ErrorResponse
 
 logger = logging.getLogger(__name__)
@@ -33,17 +34,12 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _error_response(exc.status_code, exc.code, exc.message, exc.details)
 
     @app.exception_handler(RequestValidationError)  # FastAPI's automatic 422s
-    async def handle_validation_error(request: Request, exc: AppError):
-        # Keep only loc/msg/type; "input" would echo the client's raw data back.
-        fields = [
-            {key: err[key] for key in ("loc", "msg", "type")} for err in exc.errors()
-        ]
-
+    async def handle_validation_error(request: Request, exc: RequestValidationError):
         return _error_response(
             status_code=422,
             code="validation_error",
             message="Request validation failed.",
-            details={"fields": fields},
+            details={"fields": safe_field_errors(exc.errors())},
         )
 
     # Starlette's class also covers FastAPI's HTTPException and routing 404s/405s.

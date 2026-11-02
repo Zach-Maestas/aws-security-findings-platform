@@ -99,6 +99,7 @@ submitted value is never echoed back.
 | 404 | `finding_not_found` | The finding does not exist (1.6) |
 | 405 | `method_not_allowed` | The path exists, but not for this method |
 | 422 | `validation_error` | The request body or parameters fail validation |
+| 422 | `invalid_event` | A CloudTrail event failed validation during ingest (sanitized field errors in `details.fields`) |
 | 500 | `internal_error` | An unexpected error. The message is generic; the traceback is logged server-side and never returned |
 | 503 | `service_unavailable` | A dependency is down, e.g. `/ready` when the database is unreachable |
 

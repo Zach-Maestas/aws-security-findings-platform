@@ -16,3 +16,8 @@ class AppError(Exception):
 class FindingNotFoundError(AppError):
     status_code = 404
     code = "finding_not_found"
+
+
+class InvalidEventError(AppError):
+    status_code = 422
+    code = "invalid_event"
