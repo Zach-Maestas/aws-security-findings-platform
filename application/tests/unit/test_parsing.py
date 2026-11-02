@@ -34,4 +34,6 @@ def test_bad_event_time_raises_invalid_event(load_cloudtrail):
     assert exc_info.value.code == "invalid_event"
 
     fields = exc_info.value.details["fields"]
+    # Pydantic errors also carry "input", "ctx", and "url"; those must be
+    # stripped so raw event values never leak into the error response.
     assert all(set(f) == {"loc", "msg", "type"} for f in fields)
