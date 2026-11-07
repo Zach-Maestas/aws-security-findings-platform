@@ -1,4 +1,7 @@
 from findings_platform.schemas.event import CloudTrailEvent
+from findings_platform.services.detection.security_group import (
+    handle_sg_authorize,
+)
 from findings_platform.services.detection.types import (
     Detection,
     Handler,
@@ -6,7 +9,9 @@ from findings_platform.services.detection.types import (
     IgnoreReason,
 )
 
-HANDLERS: dict[str, Handler] = {}
+HANDLERS: dict[str, Handler] = {
+    "AuthorizeSecurityGroupIngress": handle_sg_authorize,
+}
 
 
 def detect(event: CloudTrailEvent) -> Detection | Ignored:

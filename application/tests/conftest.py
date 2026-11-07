@@ -30,4 +30,7 @@ def pytest_generate_tests(metafunc):
     """Run any test that takes `cloudtrail_path` once per fixture file."""
     if "cloudtrail_path" in metafunc.fixturenames:
         paths = sorted(CLOUDTRAIL_FIXTURES.glob("*.json"))
+        # Use file stems as test IDs so a failure names the fixture, e.g.
+        # test_parse[sg_open_world_ipv4_ssh] instead of
+        # test_parse[cloudtrail_path0].
         metafunc.parametrize("cloudtrail_path", paths, ids=[p.stem for p in paths])
