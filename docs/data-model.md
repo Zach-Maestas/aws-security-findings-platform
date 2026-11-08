@@ -202,6 +202,7 @@ documentation placeholders (`111122223333`, `203.0.113.0/24`, `example-user`,
 | `sg_open_world_ipv4_all` | `AuthorizeSecurityGroupIngress` | `IAMUser` | `SG_OPEN_TO_WORLD`, CRITICAL |
 | `sg_open_world_ipv4_all_assumed_role` | `AuthorizeSecurityGroupIngress` | `AssumedRole` | `SG_OPEN_TO_WORLD`, CRITICAL |
 | `sg_modify_open_world_ipv4_all_assumed_role` | `ModifySecurityGroupRules` | `AssumedRole` | `SG_OPEN_TO_WORLD`, CRITICAL |
+| `sg_modify_multiple_rules_assumed_role` | `ModifySecurityGroupRules` (two rules) | `AssumedRole` | `SG_OPEN_TO_WORLD`, MEDIUM (TCP 21, IPv4 and IPv6) |
 | `sg_benign_single_ip` | `AuthorizeSecurityGroupIngress` | `IAMUser` | Ignored: `not_risky` |
 
 ---

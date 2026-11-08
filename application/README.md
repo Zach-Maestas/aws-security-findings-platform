@@ -111,11 +111,12 @@ expected results in [docs/data-model.md](../docs/data-model.md#test-fixtures).
 
 ```
 src/findings_platform/
-├── main.py      # creates the FastAPI app and mounts the routers
-├── api/         # HTTP routes: business endpoints under v1/; /health and /ready unversioned
-├── core/        # settings, custom exceptions, and JSON logging setup
-├── db/          # database engine and session setup
-├── models/      # SQLAlchemy models (database tables)
-├── schemas/     # Pydantic models for request and response JSON
-└── services/    # business logic: parsing events, fingerprinting, matching findings
+├── main.py         # creates the FastAPI app and mounts the routers
+├── api/            # HTTP routes: business endpoints under v1/; /health and /ready unversioned
+├── core/           # settings, custom exceptions, and JSON logging setup
+├── db/             # database engine and session setup
+├── models/         # SQLAlchemy models (database tables)
+├── schemas/        # Pydantic models for request and response JSON
+└── services/       # business logic: parsing events, fingerprinting, matching findings
+    └── detection/  # per-event handlers that turn CloudTrail events into detections
 ```
