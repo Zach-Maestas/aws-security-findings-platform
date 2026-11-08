@@ -9,6 +9,11 @@ class Severity(Enum):
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
+    @property
+    def rank(self) -> int:
+        """Position from least to most severe; members are declared in that order."""
+        return list(Severity).index(self)
+
 
 class DetectionType(Enum):
     CLOUDTRAIL_LOGGING_STOPPED = "CLOUDTRAIL_LOGGING_STOPPED"

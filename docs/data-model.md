@@ -108,7 +108,7 @@ always produces the same fingerprint.
 | Trail ARN | `requestParameters.name` | Already an ARN → keep it. Bare name → `arn:aws:cloudtrail:{awsRegion}:{recipientAccountId}:trail/{name}` |
 | Principal ARN | `requestParameters.roleName` / `userName` / `groupName` | Always built: `arn:aws:iam::{recipientAccountId}:{role\|user\|group}/{name}` |
 | Policy ARN | `requestParameters.policyArn` | Always an ARN → keep it |
-| Security group ARN | `requestParameters.groupId` | Always built: `arn:aws:ec2:{awsRegion}:{recipientAccountId}:security-group/{groupId}` |
+| Security group ARN | `requestParameters.groupId`, or `requestParameters.ModifySecurityGroupRulesRequest.GroupId` for `ModifySecurityGroupRules` | Always built: `arn:aws:ec2:{awsRegion}:{recipientAccountId}:security-group/{groupId}` |
 
 IAM is a global service, so IAM ARNs have no region — the slot between `iam::` is
 intentionally empty.
@@ -129,6 +129,83 @@ intentionally empty.
 
 ---
 
+
+## Ingest Rules
+
+### Detections
+
+| Detection | Triggering `eventName` | Risky when |
+|---|---|---|
+| `CLOUDTRAIL_LOGGING_STOPPED` | `StopLogging` | Always |
+| `ADMIN_ACCESS_GRANTED` | `AttachUserPolicy`, `AttachRolePolicy`, `AttachGroupPolicy` | `policyArn` is `arn:aws:iam::aws:policy/AdministratorAccess` |
+| `SG_OPEN_TO_WORLD` | `AuthorizeSecurityGroupIngress`, `ModifySecurityGroupRules` | A rule's source is `0.0.0.0/0` or `::/0` |
+
+`ModifySecurityGroupRules` edits an existing rule. Covering it closes the path of opening a
+group without ever calling `AuthorizeSecurityGroupIngress`. Its request has a different,
+PascalCase shape (`ModifySecurityGroupRulesRequest.SecurityGroupRule`, which arrives as a
+single object or a list), and it does not say whether the edited rule is inbound or
+outbound. Until Phase 2 looks the rule up with `DescribeSecurityGroupRules`, an outbound
+rule edited to an open range is reported as well. See
+[security.md](./security.md#known-detection-limitations).
+
+### Field Mapping
+
+Each incoming record is validated against the `CloudTrailEvent` schema
+(`schemas/event.py`), then mapped to rows:
+
+| Column | CloudTrail field |
+|---|---|
+| `events.cloudtrail_event_id` | `eventID` |
+| `events.event_name` | `eventName` |
+| `events.event_time` | `eventTime` |
+| `events.actor_type` | `userIdentity.type` |
+| `events.actor` | `userIdentity.arn`, or `userIdentity.invokedBy` when there is no ARN |
+| `events.source_ip` | `sourceIPAddress` |
+| `events.raw_event` | The whole record, as received |
+| `findings.account` | `recipientAccountId`: the account where the change happened. `userIdentity.accountId` is the caller's account, which differs under cross-account access |
+| `findings.region` | `awsRegion`; NULL for IAM findings |
+
+### Ignored Events
+
+An event that produces no finding is not stored (see [Event](#event)). Ingest logs it with
+a reason and returns an `ignored` result.
+
+| Reason | Condition | Example |
+|---|---|---|
+| `error_code` | `errorCode` is present: the call failed, so nothing changed. Checked once, before any handler runs | `AccessDenied`, `Client.UnauthorizedOperation` |
+| `unhandled_event_name` | No handler is registered for the `eventName` | `CreateSecurityGroup` |
+| `not_risky` | A handler ran and found nothing risky | A rule open to a single IP; a non-admin policy |
+
+---
+
+## Test Fixtures
+
+CloudTrail records in `application/tests/fixtures/cloudtrail/`, used by the schema,
+parser, handler, and ingest tests. Account IDs, names, IP addresses, and keys use AWS
+documentation placeholders (`111122223333`, `203.0.113.0/24`, `example-user`,
+`ASIAEXAMPLEACCESSKEY`). Every fixture has a unique `eventID`.
+
+| Fixture | `eventName` | Identity | Expected result |
+|---|---|---|---|
+| `cloudtrail_stop_logging` | `StopLogging` | `IAMUser` | `CLOUDTRAIL_LOGGING_STOPPED`, HIGH |
+| `cloudtrail_stop_logging_assumed_role` | `StopLogging` | `AssumedRole` | `CLOUDTRAIL_LOGGING_STOPPED`, HIGH |
+| `iam_attach_admin_user` | `AttachUserPolicy` | `IAMUser` | `ADMIN_ACCESS_GRANTED`, CRITICAL |
+| `iam_attach_admin_group` | `AttachGroupPolicy` | `IAMUser` | `ADMIN_ACCESS_GRANTED`, CRITICAL |
+| `iam_attach_admin_role` | `AttachRolePolicy` | `IAMUser` | `ADMIN_ACCESS_GRANTED`, CRITICAL |
+| `iam_attach_admin_role_assumed_role` | `AttachRolePolicy` | `AssumedRole` | `ADMIN_ACCESS_GRANTED`, CRITICAL |
+| `iam_attach_admin_role_access_denied` | `AttachRolePolicy` | `IAMUser` | Ignored: `error_code` |
+| `iam_attach_benign_role` | `AttachRolePolicy` (`ReadOnlyAccess`) | `IAMUser` | Ignored: `not_risky` |
+| `sg_open_world_ipv4_ssh` | `AuthorizeSecurityGroupIngress` | `IAMUser` | `SG_OPEN_TO_WORLD`, HIGH |
+| `sg_open_world_ipv4_ssh_aws_service` | `AuthorizeSecurityGroupIngress` | `AWSService` | `SG_OPEN_TO_WORLD`, HIGH; `actor` from `invokedBy` |
+| `sg_open_world_ipv4_ssh_access_denied` | `AuthorizeSecurityGroupIngress` | `IAMUser` | Ignored: `error_code` |
+| `sg_open_world_ipv6_ssh` | `AuthorizeSecurityGroupIngress` | `IAMUser` | `SG_OPEN_TO_WORLD`, HIGH (`::/0`) |
+| `sg_open_world_ipv4_all` | `AuthorizeSecurityGroupIngress` | `IAMUser` | `SG_OPEN_TO_WORLD`, CRITICAL |
+| `sg_open_world_ipv4_all_assumed_role` | `AuthorizeSecurityGroupIngress` | `AssumedRole` | `SG_OPEN_TO_WORLD`, CRITICAL |
+| `sg_modify_open_world_ipv4_all_assumed_role` | `ModifySecurityGroupRules` | `AssumedRole` | `SG_OPEN_TO_WORLD`, CRITICAL |
+| `sg_modify_multiple_rules_assumed_role` | `ModifySecurityGroupRules` (two rules) | `AssumedRole` | `SG_OPEN_TO_WORLD`, MEDIUM (TCP 21, IPv4 and IPv6) |
+| `sg_benign_single_ip` | `AuthorizeSecurityGroupIngress` | `IAMUser` | Ignored: `not_risky` |
+
+---
 
 ## Constraints and Indexes
 

@@ -29,7 +29,9 @@ The project is complete after Phase 2. From then on, only bug fixes.
 - FastAPI, PostgreSQL, SQLAlchemy, Alembic, and docker-compose for local development
 - Ingest endpoint that parses CloudTrail events into deduplicated findings; a repeat
   updates `last_seen_at` instead of creating a new row, and a duplicate event is
-  skipped, so ingest is idempotent
+  skipped, so ingest is idempotent. The security group detection covers both adding a
+  rule (`AuthorizeSecurityGroupIngress`) and editing one (`ModifySecurityGroupRules`)
+- One consistent error response shape for every endpoint
 - Findings endpoints with status changes, `/health` and `/ready`, structured JSON logs
 - Tests in the same PRs as the code: pytest unit tests, integration tests against a
   Postgres service container, Ruff, and Trivy, all enforced in `pr-checks.yml`
@@ -52,6 +54,13 @@ is skipped, and a broken change fails the PR.
   traced end to end in the logs
 - API-key auth with two roles, a status-history table for the audit trail, and
   database credentials in Secrets Manager
+- A customer-managed KMS key for RDS, Secrets Manager, SQS/SNS, and log groups, with a
+  least-privilege key policy
+- A multi-region CloudTrail trail, and an SCP restricting the account to the regions in
+  use, since EventBridge rules only see events from their own region
+- `ModifySecurityGroupRules` findings confirmed as inbound with `DescribeSecurityGroupRules`
+- The remaining known gaps in [security.md](./security.md#known-gaps) closed: actions
+  pinned to SHAs, tag-conditioned deploy permissions
 
 **Done when:** the 60-second demo works (risky change → finding → remediation → audit
 trail), and the README has an architecture diagram, a demo GIF, design decisions, and
@@ -68,5 +77,5 @@ Left out on purpose, because this workload doesn't need them:
 - **Prometheus and Grafana:** structured logs and correlation IDs cover tracing at this
   scale
 
-These are planned for a separate, smaller project built around a problem that needs
-them.
+These are planned for a separate project focused on operating and securing a
+platform.

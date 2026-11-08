@@ -42,9 +42,9 @@ Neither is applied often. Both are applied by a human, deliberately.
 Terraform 1.10 is a hard floor: the S3 backend uses native lockfile locking
 (`use_lockfile`), which does not exist in earlier versions.
 
-Your local IAM identity needs enough access to create the state bucket and the
-CI IAM roles. That is a deliberate exception to this project's no-stored-credentials
-posture — see [security.md](./security.md).
+Applying `bootstrap/` and `ci-oidc/` needs enough access to create the state bucket and
+the CI IAM roles. That access comes from a short-lived Identity Center session (see
+[Human Access](#human-access)), not stored keys.
 
 ---
 
@@ -105,11 +105,11 @@ secret scan, IaC scan, then `terraform plan` under the read-only plan role.
 ### Break-glass path — local
 
 ```bash
-make deploy    # init + apply + fmt
+make deploy    # fmt + init + apply
 make destroy
 ```
 
-These run as *you*, with your own credentials — not as the deploy role. They are for
+These run as *you*, through your Identity Center session — not as the deploy role. They are for
 when Actions is unavailable. Note that a successful local apply proves nothing about
 the CI role's permissions, since it never exercises them.
 
@@ -165,3 +165,33 @@ is added in Phase 2. For running the application locally, see
 | Assume-role fails on dispatch | Dispatched from a branch other than `main` | Merge first, dispatch from `main` |
 | `AccessDenied` mid-apply | Deploy policy is missing an action | Read the action name from the error, add it to `ci-oidc/main.tf`, re-apply `ci-oidc/` |
 | Apply blocks on an existing lock | A previous run failed to release it | Confirm no run is active, then `terraform force-unlock <id>` |
+
+---
+
+## Human Access
+
+People reach AWS through **IAM Identity Center** (SSO), not IAM users. The reasoning is
+in [security.md](./security.md#human-access).
+
+| Setting | Value |
+|---|---|
+| Identity Center region | `us-east-1` |
+| Group | `Admins` |
+| Permission set | `AdministratorAccess`, assigned to `Admins` on the account |
+| Sign-in | The AWS access portal URL, with MFA |
+
+**Console:** sign in at the access portal, open the account, and choose
+**AdministratorAccess**. Set the console's default region to `us-east-1` (Unified
+Settings) so new sessions don't open elsewhere.
+
+**CLI and local Terraform:**
+
+```bash
+aws configure sso                              # once: start URL, region us-east-1, pick the role
+aws sso login --profile <profile>              # whenever the session expires
+aws sts get-caller-identity --profile <profile>   # should show AWSReservedSSO_AdministratorAccess
+export AWS_PROFILE=<profile>                   # for terraform and make deploy/destroy
+```
+
+Identity Center is configured in the console as an account baseline, outside this
+project's Terraform. CI never uses it; GitHub Actions assumes its own OIDC roles.
