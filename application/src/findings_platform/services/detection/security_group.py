@@ -40,7 +40,34 @@ def _rules_from_authorize(params: dict[str, Any]) -> list[Rule]:
 
 
 def _rules_from_modify(params: dict[str, Any]) -> list[Rule]:
-    pass
+    """One Rule per CIDR source in a ModifySecurityGroupRules request.
+
+    CloudTrail logs the rule list as a dict for one rule and a list for several.
+    Group and prefix-list sources are skipped, as in _rules_from_authorize.
+    """
+    rules: list[Rule] = []
+
+    modify_request = params.get("ModifySecurityGroupRulesRequest", {})
+    entries = modify_request.get("SecurityGroupRule", [])
+
+    if isinstance(entries, dict):
+        entries = [entries]
+    for entry in entries:
+        rule = entry.get("SecurityGroupRule", {})
+        cidr = rule.get("CidrIpv4") or rule.get("CidrIpv6")
+
+        if not cidr:
+            continue
+        rules.append(
+            Rule(
+                protocol=rule.get("IpProtocol"),
+                from_port=rule.get("FromPort"),
+                to_port=rule.get("ToPort"),
+                cidr=cidr,
+            )
+        )
+
+    return rules
 
 
 def _rule_severity(rule: Rule) -> Severity | None:
@@ -49,6 +76,7 @@ def _rule_severity(rule: Rule) -> Severity | None:
         return None
     if rule.protocol in ("-1", "all"):
         return Severity.CRITICAL
+    # TCP and UDP are represented by '6' and '17' respectively in AWS.
     if rule.protocol in ("tcp", "udp", "6", "17"):
         # Ports unknown, so assume the range could include a risky port.
         if rule.from_port is None or rule.to_port is None:
@@ -100,10 +128,15 @@ def handle_sg_authorize(event: CloudTrailEvent) -> Detection | None:
     """
     params = event.request_parameters or {}
     group_ref = params.get("groupId") or params.get("groupName")
-    rules = _rules_from_authorize(params)
-
-    return _detect_open_rules(event, group_ref, rules)
+    return _detect_open_rules(event, group_ref, _rules_from_authorize(params))
 
 
 def handle_sg_modify(event: CloudTrailEvent) -> Detection | None:
-    pass
+    """Detect rules changed to world-open by ModifySecurityGroupRules.
+
+    The group is the GroupId inside ModifySecurityGroupRulesRequest; the API
+    requires it, so there's no groupName fallback.
+    """
+    params = event.request_parameters or {}
+    group_ref = params.get("ModifySecurityGroupRulesRequest", {}).get("GroupId")
+    return _detect_open_rules(event, group_ref, _rules_from_modify(params))

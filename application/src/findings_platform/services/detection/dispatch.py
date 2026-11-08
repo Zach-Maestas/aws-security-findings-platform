@@ -1,6 +1,7 @@
 from findings_platform.schemas.event import CloudTrailEvent
 from findings_platform.services.detection.security_group import (
     handle_sg_authorize,
+    handle_sg_modify,
 )
 from findings_platform.services.detection.types import (
     Detection,
@@ -11,6 +12,7 @@ from findings_platform.services.detection.types import (
 
 HANDLERS: dict[str, Handler] = {
     "AuthorizeSecurityGroupIngress": handle_sg_authorize,
+    "ModifySecurityGroupRules": handle_sg_modify,
 }
 
 
