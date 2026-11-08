@@ -3,6 +3,11 @@
 FROM python:3.13-slim
 WORKDIR /app
 
+# Apply Debian security updates; the base image can lag behind published fixes.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create least-privilege user for the container, set gecos to empty avoiding interactive creation
 RUN adduser --disabled-password --gecos "" \
     --shell /usr/sbin/nologin appuser
