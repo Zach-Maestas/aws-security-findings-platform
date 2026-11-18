@@ -24,6 +24,22 @@ def test_risky_event_creates_finding(client, db_session, load_cloudtrail):
     assert db_session.get(Finding, uuid.UUID(finding_id)) is not None
 
 
+def test_repeat_event_updates_existing_finding(client, load_cloudtrail):
+    payload = load_cloudtrail("sg_open_world_ipv4_ssh")
+
+    first = client.post("/api/v1/events", json=payload)
+    assert first.status_code == 201
+    first_finding_id = first.json()["finding_id"]
+
+    payload["eventID"] = str(uuid.uuid4())
+    second = client.post("/api/v1/events", json=payload)
+    assert second.status_code == 200
+
+    body = second.json()
+    assert body["outcome"] == "updated"
+    assert body["finding_id"] == first_finding_id
+
+
 def test_same_event_twice_is_skipped_as_duplicate(client, db_session, load_cloudtrail):
     payload = load_cloudtrail("sg_open_world_ipv4_ssh")
 
