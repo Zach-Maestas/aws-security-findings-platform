@@ -40,8 +40,71 @@ key made each change. See [security.md](./security.md#application-security).
 
 ### Events
 
-Ingest is added in card 1.4. It accepts one CloudTrail record and reports what happened to
-it (a finding created or updated, a duplicate skipped, or the event ignored).
+| Method | Path | Purpose | Success | Failure |
+|---|---|---|---|---|
+| `POST` | `/api/v1/events` | Ingest one CloudTrail record | `201` created, `200` otherwise | `422 invalid_event`, `422 validation_error` |
+
+The body is **one CloudTrail record** (an element of a log file's `Records` array), sent
+as-is in CloudTrail's camelCase. The response reports what happened to it:
+
+```json
+{
+  "outcome": "created",
+  "finding_id": "8aa9b55c-4696-4dd1-bb7f-a9f820f6d515",
+  "reason": null
+}
+```
+
+| `outcome` | Status | Meaning | `finding_id` | `reason` |
+|---|---|---|---|---|
+| `created` | 201 | A new OPEN finding was opened for this event | the new finding | `null` |
+| `updated` | 200 | The event attached to an existing OPEN or SUPPRESSED finding with the same fingerprint | the existing finding | `null` |
+| `duplicate` | 200 | An event with this `eventID` is already stored; nothing changed | `null` | `null` |
+| `ignored` | 200 | No detection applies; nothing was stored | `null` | why (below) |
+
+| `reason` | When |
+|---|---|
+| `error_code` | The call failed in AWS (the record has an `errorCode`, e.g. `AccessDenied`), so nothing changed |
+| `unhandled_event_name` | No detection handles this `eventName` |
+| `not_risky` | A detection handles it, but this change isn't risky (e.g. an SG rule open to one IP) |
+
+**Ingest is idempotent.** Sending the same record any number of times leaves the same
+state as sending it once, so retries are always safe:
+
+- **Duplicate:** the `eventID` is unique across stored events, so a resend is skipped.
+- **Repeat:** a new event with the same fingerprint attaches to the existing finding
+  instead of opening a second one. Severity only rises, `last_seen_at` only moves forward
+  (events can arrive out of order), and status is left alone, so a SUPPRESSED finding
+  stays suppressed.
+- **Recurrence:** RESOLVED findings never match. An event for a resolved problem opens a
+  new finding, and the resolved one is kept as history.
+
+Checks run in this order: validation, then detection (`ignored`), then the duplicate check,
+then the match against an OPEN or SUPPRESSED finding. Ignored events are never stored, so
+resending one returns `ignored` again, never `duplicate`. Everything stored for one event,
+the finding and the event row, is committed in one transaction. See
+[data-model.md](./data-model.md) for fingerprints and the partial unique index.
+
+**Errors:** a body that is valid JSON but not a valid CloudTrail record returns `422
+invalid_event`. Its `details.fields` locations use CloudTrail's field names, with no
+`body` prefix, because the service validates the record itself:
+
+```json
+{
+  "error": {
+    "code": "invalid_event",
+    "message": "CloudTrail event failed validation.",
+    "details": {
+      "fields": [
+        {"loc": ["eventTime"], "msg": "Input should be a valid datetime or date, ...", "type": "datetime_from_date_parsing"}
+      ]
+    }
+  }
+}
+```
+
+A body that isn't a JSON object at all is rejected earlier, by FastAPI, with `422
+validation_error`.
 
 ### Findings
 
